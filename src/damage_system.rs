@@ -1,6 +1,6 @@
 use rltk::console;
 use specs::prelude::*;
-use crate::Player;
+use crate::{Player, Name, GameLog};
 
 use super::{CombatStats, SufferDamage};
 
@@ -28,12 +28,20 @@ pub fn delete_the_dead(ecs : &mut World) {
     {
         let combat_stats = ecs.read_storage::<CombatStats>();
         let entities = ecs.entities();
+        let names = ecs.read_storage::<Name>();
         let players = ecs.read_storage::<Player>();
+        let mut log = ecs.write_resource::<GameLog>();
         for (entity, stats) in (&entities, &combat_stats).join() {
             if stats.hp < 1 {
                 let player = players.get(entity);
                 match player {
-                    None => dead.push(entity),
+                    None => {
+                        let victim_name = names.get(entity);
+                        if let Some(victim_name) = victim_name {
+                            log.entries.push(format!("{} is dead", &victim_name.name));
+                        }
+                        dead.push(entity);
+                    }
                     Some(_) => console::log("you are dead"),
                 }
             }
