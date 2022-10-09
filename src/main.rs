@@ -27,6 +27,9 @@ mod spawner;
 pub use spawner::*;
 mod inventory_system;
 pub use inventory_system::*;
+extern crate serde;
+use specs::saveload::{SimpleMarker, SimpleMarkerAllocator};
+pub mod saveload_system;
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum RunState {
@@ -40,6 +43,10 @@ pub enum RunState {
         range : i32,
         item : Entity,
     },
+    MainMenu {
+        menu_selection : gui::MainMenuSelection,
+    },
+    SaveGame,
 }
 
 pub struct State {
@@ -54,6 +61,28 @@ impl GameState for State {
         {
             let runstate = self.ecs.fetch::<RunState>();
             newrunstate = *runstate;
+        }
+        match newrunstate {
+            RunState::MainMenu {..} => {}
+            _ => {
+                draw_map(&self.ecs, ctx);
+
+                let positions = self.ecs.read_storage::<Position>();
+                let renderables = self.ecs.read_storage::<Renderable>();
+                let map = self.ecs.fetch::<Map>();
+
+                let mut data = (&positions, &renderables).join().collect::<Vec<_>>();
+                data.sort_by(|&a, &b| b.1.render_order.cmp(&a.1.render_order));
+                
+                // render player and monsters
+                for (pos, render) in data.iter() {
+                    let idx = xy_idx(pos.x, pos.y);
+                    if map.visible_tiles[idx] {
+                        ctx.set(pos.x, pos.y, render.fg, render.bg, render.glyph);
+                    }
+                }
+                gui::draw_ui(&self.ecs, ctx);
+            }
         }
 
         match newrunstate {
@@ -119,6 +148,27 @@ impl GameState for State {
                     }
                 }
             }
+            RunState::MainMenu { .. } => {
+                let result = gui::main_menu(self, ctx);
+                match result {
+                    gui::MainMenuResult::NoSelection { selected } => newrunstate = RunState::MainMenu { menu_selection: selected },
+                    gui::MainMenuResult::Selected { selected } => {
+                        match selected {
+                            gui::MainMenuSelection::NewGame => newrunstate = RunState::PreRun,
+                            gui::MainMenuSelection::LoadGame => {
+                                saveload_system::load_game(&mut self.ecs);
+                                newrunstate = RunState::AwaitingInput;
+                                saveload_system::delete_save();
+                            }
+                            gui::MainMenuSelection::Quit => ::std::process::exit(0),
+                        }
+                    }
+                }
+            }
+            RunState::SaveGame => {
+                saveload_system::save_game(&mut self.ecs);
+                newrunstate = RunState::MainMenu { menu_selection: gui::MainMenuSelection::Quit };
+            }
         }
 
         {
@@ -128,23 +178,6 @@ impl GameState for State {
 
         damage_system::delete_the_dead(&mut self.ecs);
 
-        draw_map(&self.ecs, ctx);
-        
-        let positions = self.ecs.read_storage::<Position>();
-        let renderables = self.ecs.read_storage::<Renderable>();
-        let map = self.ecs.fetch::<Map>();
-
-        let mut data = (&positions, &renderables).join().collect::<Vec<_>>();
-        data.sort_by(|&a, &b| b.1.render_order.cmp(&a.1.render_order));
-        
-        // render player and monsters
-        for (pos, render) in data.iter() {
-            let idx = xy_idx(pos.x, pos.y);
-            if map.visible_tiles[idx] {
-                ctx.set(pos.x, pos.y, render.fg, render.bg, render.glyph);
-            }
-        }
-        gui::draw_ui(&self.ecs, ctx);
     }
 }
 
@@ -200,8 +233,12 @@ fn main() -> rltk::BError {
     gs.ecs.register::<InflictDamage>();
     gs.ecs.register::<AreaOfEffect>();
     gs.ecs.register::<Confusion>();
+    gs.ecs.register::<SimpleMarker<SerializeMe>>();
+    gs.ecs.register::<SerializationHelper>();
 
-    let map = Map::new();
+    gs.ecs.insert(SimpleMarkerAllocator::<SerializeMe>::new());
+
+    let map = Map::new(1);
     let (player_x, player_y) = map.rooms[0].center();
 
     let player_entity = spawner::player(&mut gs.ecs, player_x, player_y);
