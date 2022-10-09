@@ -6,6 +6,7 @@ use std::cmp::{max, min};
 use crate::Viewshed;
 use crate::Player;
 use rltk::{Point};
+use serde::{Serialize, Deserialize};
 
 const MAX_ROOMS : i32 = 30;
 const MIN_SIZE : i32 = 6;
@@ -14,12 +15,13 @@ pub const MAPWIDTH : usize = 80;
 pub const MAPHEIGHT : usize = 43;
 pub const MAPCOUNT : usize = MAPHEIGHT * MAPWIDTH;
 
-#[derive(PartialEq, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub enum TileType {
     Wall, 
-    Floor
+    Floor,
 }
 
+#[derive(Default, Serialize, Deserialize, Clone)]
 pub struct Map {
     pub tiles : Vec<TileType>,
     pub rooms : Vec<Rect>,
@@ -28,12 +30,16 @@ pub struct Map {
     pub revealed_tiles : Vec<bool>,
     pub visible_tiles : Vec<bool>,
     pub blocked : Vec<bool>,
-    pub tile_content : Vec<Vec<Entity>>
+    pub depth : i32,
+
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    pub tile_content : Vec<Vec<Entity>>,
 }
 
 impl Map {
 
-    pub fn new() -> Self {
+    pub fn new(new_depth : i32) -> Self {
         let mut map = Map {
             tiles : vec![TileType::Wall; MAPCOUNT],
             rooms : Vec::new(),
@@ -42,7 +48,8 @@ impl Map {
             revealed_tiles : vec![false; MAPCOUNT],
             visible_tiles : vec![false; MAPCOUNT],
             blocked : vec![false; MAPCOUNT],
-            tile_content : vec![Vec::new(); MAPCOUNT]
+            depth : new_depth,
+            tile_content : vec![Vec::new(); MAPCOUNT],
         };
     
         let mut rng = RandomNumberGenerator::new();

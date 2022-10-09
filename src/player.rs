@@ -91,9 +91,15 @@ pub fn player_input(gs : &mut State, ctx : &mut Rltk) -> RunState {
             VirtualKeyCode::C => try_move_player(1, 1, &mut gs.ecs),
             VirtualKeyCode::Numpad1 |
             VirtualKeyCode::Z => try_move_player(-1, 1, &mut gs.ecs),
+            
+            // Picking up items
             VirtualKeyCode::G => get_item(&mut gs.ecs),
             VirtualKeyCode::I => return RunState::ShowInventory,
-            VirtualKeyCode::D => return RunState::ShowDropItem,
+            VirtualKeyCode::F => return RunState::ShowDropItem,
+
+            // Save and Quit
+            VirtualKeyCode::Escape => return RunState::SaveGame,
+            
             _ => {
                 return RunState::AwaitingInput
             }
