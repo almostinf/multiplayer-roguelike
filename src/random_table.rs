@@ -1,5 +1,7 @@
 use rltk::RandomNumberGenerator;
 
+use crate::map;
+
 pub struct RandomEntry {
     name : String,
     weight : i32,
@@ -29,8 +31,10 @@ impl RandomTable {
     }
 
     pub fn add<S:ToString>(mut self, name : S, weight : i32) -> RandomTable {
-        self.total_weight += weight;
-        self.entries.push(RandomEntry::new(name.to_string(), weight));
+        if weight > 0 {
+            self.total_weight += weight;
+            self.entries.push(RandomEntry::new(name.to_string(), weight));
+        }
         self
     }
 
@@ -52,12 +56,16 @@ impl RandomTable {
     }
 }
 
-pub fn room_table(map_weight : i32) -> RandomTable {
+pub fn room_table(map_depth : i32) -> RandomTable {
     RandomTable::new()
         .add("Goblin", 10)
-        .add("Orc", 1 + map_weight)
+        .add("Orc", 1 + map_depth)
         .add("Health Potion", 2)
-        .add("Fireball Scroll", 2 + map_weight)
-        .add("Confusion Scroll", 2 + map_weight)
+        .add("Fireball Scroll", 2 + map_depth)
+        .add("Confusion Scroll", 2 + map_depth)
         .add("Magic Missible Scroll", 4)
+        .add("Dagger", 3)
+        .add("Shield", 3)
+        .add("Longsword", map_depth - 1)
+        .add("Tower Shield", map_depth - 1)
 }
