@@ -1,6 +1,8 @@
+use std::f32::consts::E;
+
 use rltk::console;
 use specs::prelude::*;
-use crate::{Player, Name, GameLog};
+use crate::{Player, Name, GameLog, RunState};
 
 use super::{CombatStats, SufferDamage};
 
@@ -42,7 +44,10 @@ pub fn delete_the_dead(ecs : &mut World) {
                         }
                         dead.push(entity);
                     }
-                    Some(_) => console::log("you are dead"),
+                    Some(_) => {
+                        let mut runstate = ecs.write_resource::<RunState>();
+                        *runstate = RunState::GameOver;
+                    }
                 }
             }
         }
