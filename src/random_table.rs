@@ -1,6 +1,5 @@
 use rltk::RandomNumberGenerator;
 
-use crate::map;
 
 pub struct RandomEntry {
     name : String,

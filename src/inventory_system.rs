@@ -1,8 +1,5 @@
-use std::fmt::format;
-
 use specs::prelude::*;
 use crate::{WantsToUseItem, ProvidesHealing, CombatStats, WantsToDropItem, Consumable, SufferDamage, InflictDamage, xy_idx, Map, AreaOfEffect, Confusion, Equippable, Equipped, WantsToRemoveItem};
-
 use super::{WantsToPickupItem, Name, InBackpack, Position, gamelog::GameLog};
 
 

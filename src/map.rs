@@ -1,10 +1,7 @@
 use rltk::{ RGB, Rltk, RandomNumberGenerator };
-use specs::Join;
-use specs::{World, WorldExt,Entity};
+use specs::{World, Entity};
 use super::Rect;
 use std::cmp::{max, min};
-use crate::Viewshed;
-use crate::Player;
 use rltk::{Point};
 use serde::{Serialize, Deserialize};
 

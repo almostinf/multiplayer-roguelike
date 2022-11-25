@@ -10,6 +10,7 @@ pub struct Position {
     pub x : i32,
     pub y : i32,
 }
+
 // #[derive(Component)] is the same like:
 // impl Component for Position {
 //     type Storage = VecStorage<Self>;
@@ -54,7 +55,7 @@ pub struct CombatStats {
 
 #[derive(Component, Debug, Clone, ConvertSaveload)]
 pub struct WantsToMelee {
-    pub target : Entity
+    pub target : Entity,
 }
 
 #[derive(Component, Debug, ConvertSaveload, Clone)]
@@ -133,7 +134,7 @@ pub struct SerializeMe;
 // Special component that exists to help serialize the game data
 #[derive(Component, Serialize, Deserialize, Clone)]
 pub struct SerializationHelper {
-    pub map : super::map::Map
+    pub map : super::map::Map,
 }
 
 #[derive(PartialEq, Copy, Clone, Serialize, Deserialize)]

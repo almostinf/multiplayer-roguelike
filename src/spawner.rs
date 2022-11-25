@@ -6,11 +6,11 @@ use crate::{AreaOfEffect, EquipmentSlot, Equippable, MeleePowerBonus, DefenseBon
 use super::random_table::*;
 
 use super::{CombatStats, Player, Renderable, Name, Position, Viewshed, Monster, BlocksTile, Rect, Item, ProvidesHealing, Consumable, Ranged, InflictDamage, Confusion, SerializeMe};
-use super::{MAPCOUNT, MAPHEIGHT, MAPWIDTH};
+use super::MAPWIDTH;
 use specs::saveload::{MarkedBuilder, SimpleMarker};
 
 const MAX_MONSTERS : i32 = 4;
-const MAX_ITEMS: i32 = 2;
+// const MAX_ITEMS: i32 = 2;
 
 /// Spawns the player and returns his entity object
 pub fn player(ecs: &mut World, player_x: i32, player_y: i32) -> Entity {

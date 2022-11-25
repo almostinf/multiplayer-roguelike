@@ -1,4 +1,4 @@
-use rltk::{Rltk, GameState, RGB, Point};
+use rltk::{Rltk, GameState, Point};
 use specs::prelude::*;
 
 mod map;

@@ -1,8 +1,7 @@
 use specs::prelude::*;
 use crate::{MeleePowerBonus, DefenseBonus, Equipped};
-
 use super::{CombatStats, WantsToMelee, SufferDamage, Name, GameLog};
-use rltk::console;
+
 
 pub struct MeleeCombatSystem {}
 
@@ -16,7 +15,7 @@ impl<'a> System<'a> for MeleeCombatSystem {
                         ReadStorage<'a, MeleePowerBonus>,
                         ReadStorage<'a, DefenseBonus>,
                         ReadStorage<'a, Equipped>
-                      );
+                    );
             
     fn run(&mut self, data : Self::SystemData) {
         let (entities, mut log, 

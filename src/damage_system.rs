@@ -1,6 +1,3 @@
-use std::f32::consts::E;
-
-use rltk::console;
 use specs::prelude::*;
 use crate::{Player, Name, GameLog, RunState};
 
