@@ -1,6 +1,6 @@
 use specs::prelude::*;
 use specs_derive::*;
-use rltk::{RGB};
+use rltk::RGB;
 use serde::{Serialize, Deserialize};
 use specs::saveload::{Marker, ConvertSaveload};
 use specs::error::NoError;

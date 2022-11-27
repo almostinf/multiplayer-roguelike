@@ -10,6 +10,7 @@ use player::*;
 mod components;
 pub use components::*;
 mod visibility_system;
+use url::Url;
 pub use visibility_system::*;
 mod monster_ai_system;
 pub use monster_ai_system::*;
@@ -32,6 +33,9 @@ use specs::saveload::{SimpleMarker, SimpleMarkerAllocator};
 pub mod saveload_system;
 mod random_table;
 pub use random_table::*;
+mod client;
+pub use client::*;
+
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum RunState {
@@ -56,6 +60,7 @@ pub enum RunState {
 
 pub struct State {
     pub ecs : World,
+    pub game_client : Client,
 }
 
 impl GameState for State {
@@ -380,9 +385,20 @@ fn main() -> rltk::BError {
         .with_title("Roguelike Testing")
         .build()?;
     context.with_post_scanlines(true);
+
+    let map = Map::new(1);
+    let (player_x, player_y) = map.rooms[0].center();
+    let mut game_client = Client::new(Url::parse("ws://127.0.0.1:6881").expect("Address error"));
+    let message = format!("{{\"__MESSAGE__\":\"Pos: {} {}\"}}", player_x, player_y).as_bytes().to_vec();
+    game_client.send_message(message);
+    let (key, value) = game_client.get_message().unwrap();
+    println!("{} {}", key, value);
+
     let mut gs = State{ 
         ecs : World::new(),
+        game_client,
     };
+
     gs.ecs.register::<Position>();
     gs.ecs.register::<Renderable>();
     gs.ecs.register::<Player>();
@@ -414,8 +430,6 @@ fn main() -> rltk::BError {
 
     gs.ecs.insert(SimpleMarkerAllocator::<SerializeMe>::new());
 
-    let map = Map::new(1);
-    let (player_x, player_y) = map.rooms[0].center();
 
     let player_entity = spawner::player(&mut gs.ecs, player_x, player_y);
     gs.ecs.insert(rltk::RandomNumberGenerator::new());
@@ -425,6 +439,16 @@ fn main() -> rltk::BError {
     }
 
     gs.ecs.insert(map);
+
+    let message = format!("{{\"__IS_MAP__\":\"{}\"}}", 1).as_bytes().to_vec();
+    gs.game_client.send_message(message);
+    let (key, value) = gs.game_client.get_message().unwrap();
+    println!("{} {}", key, value);
+    // if gs.game_client.socket.can_read() {
+    //     let (key, value) = gs.game_client.get_message().unwrap();
+    //     println!("{} {}", key, value);
+    // }
+
     gs.ecs.insert(Point::new(player_x, player_y));
     gs.ecs.insert(player_entity);
     gs.ecs.insert(RunState::PreRun);
