@@ -168,3 +168,6 @@ pub struct DefenseBonus {
 pub struct WantsToRemoveItem {
     pub item : Entity,
 }
+
+#[derive(Component, Debug, Clone)]
+pub struct Enemy {}

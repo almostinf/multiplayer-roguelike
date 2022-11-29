@@ -20,7 +20,7 @@ pub fn try_move_player(game_client : &mut Client, delta_x : i32, delta_y : i32, 
         if pos.x + delta_x < 1 || pos.x + delta_x > map.width-1 || pos.y + delta_y < 1 || pos.y + delta_y > map.height-1 { return; }
         let destination_idx = xy_idx(pos.x + delta_x, pos.y + delta_y);
 
-        let message = format!("{{\"__MESSAGE__\":\"Pos: {} {}\"}}", pos.x + delta_x, pos.y + delta_y).as_bytes().to_vec();
+        let message = format!("{{\"__MESSAGE__\":\"main {}\"}}", destination_idx).as_bytes().to_vec();
         game_client.send_message(message);
 
         for potential_target in map.tile_content[destination_idx].iter() {

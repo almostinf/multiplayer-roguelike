@@ -21,24 +21,34 @@ impl Client {
     pub fn get_message(&mut self) -> Result<(String, String), String> {
         if self.socket.can_read() {
             let message = self.socket.read_message().unwrap().to_string();
+            //println!("{}", message);
             let mut key = String::new();
             let mut turn = false;
             let mut skip = true;
+            let mut skip_x2 = false;
+            let mut count = 0;
             let mut value = String::new();
             for (i, ch) in message.chars().enumerate() {
-                if i == 0 || i == 1 || i == message.len() - 1 {
-                    continue;
-                } 
+                if i == 0 || i == 1 || i == message.len() - 1 || i == message.len() - 2 {
+                    continue;   
+                }
                 if skip {
                     skip = false;
                     continue;
                 }
+                if skip_x2 {
+                    if count == 1 {
+                        skip_x2 = false;
+                    }
+                    count += 1;
+                    continue;
+                }
                 if ch == '"' && !turn {
                     turn = true;
-                    skip = true;
+                    skip_x2 = true;
                 } else if !turn {
                     key.push(ch);
-                } else if ch == '"' && turn {
+                } else if ch == '\\' && turn {
                     continue;
                 } else if turn {
                     value.push(ch);

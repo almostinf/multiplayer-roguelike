@@ -142,6 +142,10 @@ pub fn xy_idx(x : i32, y : i32) -> usize {
     (y as usize * MAPWIDTH) + x as usize
 }
 
+pub fn idx_xy(idx : i32) -> (i32, i32) {
+    (idx % MAPWIDTH as i32, idx / MAPWIDTH as i32)
+}
+
 impl rltk::Algorithm2D for Map {
     fn dimensions(&self) -> rltk::Point {
         rltk::Point::new(self.width, self.height)

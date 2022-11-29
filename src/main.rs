@@ -35,7 +35,12 @@ mod random_table;
 pub use random_table::*;
 mod client;
 pub use client::*;
+mod enemies;
+pub use enemies::*;
 
+use crate::saveload_system::{save_map, set_map};
+
+const NAME : &str = "main";
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum RunState {
@@ -61,6 +66,7 @@ pub enum RunState {
 pub struct State {
     pub ecs : World,
     pub game_client : Client,
+    pub enemies : Vec<String>,
 }
 
 impl GameState for State {
@@ -218,10 +224,17 @@ impl GameState for State {
     }
 }
 
+
 impl State {
     fn run_systems(&mut self) {
         let mut vis = VisibilitySystem{};
         vis.run_now(&self.ecs);
+
+        // TESTING
+        let enemies_pos = self.get_enemies_pos();
+        let mut en = EnemySystem{enemies_pos};
+        en.run_now(&self.ecs);
+
         let mut mob = MonsterAI{};
         mob.run_now(&self.ecs);
         let mut mapindex = MapIndexingSystem {};
@@ -240,6 +253,35 @@ impl State {
         item_remove.run_now(&self.ecs);
 
         self.ecs.maintain();
+    }
+
+    fn get_enemies_pos(&mut self) -> Vec<(String, i32)> {
+        let mut enemies_pos = Vec::<(String, i32)>::new();
+        let (key, value) = match self.game_client.get_message() {
+            Ok((key, value)) => (key, value),
+            Err(..) => ("".to_string(), "".to_string()),
+        };
+        if key == "_MESSAGE__" {
+            let split = value.split(' ');
+            let v = split.collect::<Vec<&str>>();
+            let name = v[0].to_string();
+            let name_check = name.clone();
+            let idx = v[1].parse::<i32>().unwrap();
+            let mut check = false;
+            for n in self.enemies.iter() {
+                if name == *n && name != NAME {
+                    enemies_pos.push((name, idx));
+                    check = true;
+                    break;
+                }
+            }
+            if !check {
+                let x = idx_xy(idx).0;
+                let y = idx_xy(idx).1;
+                spawner::enemy(&mut self.ecs, x, y, name_check);
+            }
+        }
+        enemies_pos
     }
 
     fn entities_to_remove_on_level_change(&mut self) -> Vec<Entity> {
@@ -388,15 +430,16 @@ fn main() -> rltk::BError {
 
     let map = Map::new(1);
     let (player_x, player_y) = map.rooms[0].center();
-    let mut game_client = Client::new(Url::parse("ws://127.0.0.1:6881").expect("Address error"));
-    let message = format!("{{\"__MESSAGE__\":\"Pos: {} {}\"}}", player_x, player_y).as_bytes().to_vec();
-    game_client.send_message(message);
-    let (key, value) = game_client.get_message().unwrap();
-    println!("{} {}", key, value);
+    
+    // let message = format!("{{\"__MESSAGE__\":\"Pos: {} {}\"}}", player_x, player_y).as_bytes().to_vec();
+    // game_client.send_message(message);
+    // let (key, value) = game_client.get_message().unwrap();
+    // println!("{} {}", key, value);
 
     let mut gs = State{ 
         ecs : World::new(),
-        game_client,
+        game_client : Client::new(Url::parse("ws://127.0.0.1:6881").expect("Address error")),
+        enemies : Vec::<String>::new(),
     };
 
     gs.ecs.register::<Position>();
@@ -427,6 +470,7 @@ fn main() -> rltk::BError {
     gs.ecs.register::<MeleePowerBonus>();
     gs.ecs.register::<DefenseBonus>();
     gs.ecs.register::<WantsToRemoveItem>();
+    
 
     gs.ecs.insert(SimpleMarkerAllocator::<SerializeMe>::new());
 
@@ -439,20 +483,33 @@ fn main() -> rltk::BError {
     }
 
     gs.ecs.insert(map);
-
-    let message = format!("{{\"__IS_MAP__\":\"{}\"}}", 1).as_bytes().to_vec();
-    gs.game_client.send_message(message);
-    let (key, value) = gs.game_client.get_message().unwrap();
-    println!("{} {}", key, value);
-    // if gs.game_client.socket.can_read() {
-    //     let (key, value) = gs.game_client.get_message().unwrap();
-    //     println!("{} {}", key, value);
-    // }
-
     gs.ecs.insert(Point::new(player_x, player_y));
     gs.ecs.insert(player_entity);
     gs.ecs.insert(RunState::PreRun);
     gs.ecs.insert(GameLog{ entries : vec!["Welcome to Rusty Roguelike".to_string()] });
+
+    let message = format!("{{\"__IS_MAP__\":\"{}\"}}", 1).as_bytes().to_vec();
+    gs.game_client.send_message(message);
+
+    loop {
+        let (key, value) = gs.game_client.get_message().unwrap();
+        if key == "_IS_MAP__" {
+            if value == "F" {
+                let new_map = save_map(&mut gs.ecs);
+                let message = format!("{{\"__MAP__\":\"{}\"}}", new_map).as_bytes().to_vec();
+                println!("message size: {}", message.len());
+                gs.game_client.send_message(message);
+            } else {
+                set_map(&mut gs.ecs, value);
+            }
+            break;
+        }
+    }
+
+    // if gs.game_client.socket.can_read() {
+    //     let (key, value) = gs.game_client.get_message().unwrap();
+    //     println!("{} {}", key, value);
+    // }
 
     rltk::main_loop(context, gs)
 }

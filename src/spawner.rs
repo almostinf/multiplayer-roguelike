@@ -5,7 +5,7 @@ use specs::prelude::*;
 use crate::{AreaOfEffect, EquipmentSlot, Equippable, MeleePowerBonus, DefenseBonus};
 use super::random_table::*;
 
-use super::{CombatStats, Player, Renderable, Name, Position, Viewshed, Monster, BlocksTile, Rect, Item, ProvidesHealing, Consumable, Ranged, InflictDamage, Confusion, SerializeMe};
+use super::{CombatStats, Player, Renderable, Name, Position, Viewshed, Monster, BlocksTile, Rect, Item, ProvidesHealing, Consumable, Ranged, InflictDamage, Confusion, SerializeMe, Enemy};
 use super::MAPWIDTH;
 use specs::saveload::{MarkedBuilder, SimpleMarker};
 
@@ -14,8 +14,7 @@ const MAX_MONSTERS : i32 = 4;
 
 /// Spawns the player and returns his entity object
 pub fn player(ecs: &mut World, player_x: i32, player_y: i32) -> Entity {
-    ecs
-        .create_entity()
+    ecs.create_entity()
         .with(Position{x: player_x, y: player_y})
         .with(Renderable {
             glyph: rltk::to_cp437('@'),
@@ -28,6 +27,23 @@ pub fn player(ecs: &mut World, player_x: i32, player_y: i32) -> Entity {
         .with(Name {name: "Player".to_string()})
         .with(CombatStats{max_hp: 30, hp: 30, defense: 2, power: 5})
         .marked::<SimpleMarker<SerializeMe>>()
+        .build()
+}
+
+/// Spawns the enemy
+pub fn enemy(ecs: &mut World, enemy_x: i32, enemy_y: i32, enemy_name: String) -> Entity {
+    ecs.create_entity()
+        .with(Position{x: enemy_x, y: enemy_y})
+        .with(Renderable {
+            glyph: rltk::to_cp437('&'),
+            fg: RGB::named(rltk::DARKBLUE),
+            bg: RGB::named(rltk::BLACK),
+            render_order: 1,
+        })
+        .with(BlocksTile{})
+        .with(Enemy {})
+        .with(Name {name: enemy_name})
+        .with(CombatStats{max_hp: 30, hp: 30, defense: 2, power: 5})
         .build()
 }
 

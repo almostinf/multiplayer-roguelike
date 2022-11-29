@@ -1,5 +1,5 @@
 use specs::prelude::*;
-use crate::xy_idx;
+use crate::{xy_idx};
 
 use super::{Viewshed, Position, Map, Player};
 use rltk::{field_of_view, Point};
@@ -12,7 +12,7 @@ impl<'a> System<'a> for VisibilitySystem {
                         Entities<'a>,
                         WriteStorage<'a, Viewshed>, 
                         WriteStorage<'a, Position>,
-                        ReadStorage<'a, Player>
+                        ReadStorage<'a, Player>,
                     );
 
     fn run(&mut self, data : Self::SystemData) {

@@ -67,8 +67,8 @@ pub fn save_map(ecs : &mut World) -> String {
         let mut serializer = serde_json::Serializer::new(writer);
         serialize_individually!(ecs, serializer, data, Position, Renderable, Player, Viewshed, Monster,
             Name, BlocksTile, CombatStats, SufferDamage, WantsToMelee, Item, Consumable, Ranged, InflictDamage,
-            AreaOfEffect, Confusion, ProvidesHealing, InBackpack, WantsToPickupItem, WantsToUseItem,
-            WantsToDropItem, SerializationHelper, Equippable, Equipped, MeleePowerBonus, DefenseBonus
+            AreaOfEffect, Confusion, ProvidesHealing, WantsToPickupItem, WantsToUseItem,
+            WantsToDropItem, SerializationHelper
         );
     }
 
@@ -166,6 +166,10 @@ pub fn set_map(ecs : &mut World, new_map : String) {
     }
 
     let data = new_map;
+    // let data = fs::read_to_string("./savemap.json").unwrap();
+    // println!("data: {}", data);
+    // println!("message: {}", new_map);
+    // println!("Equal: {}", data == new_map);
     let mut de = serde_json::Deserializer::from_str(&data);
 
     {
@@ -173,8 +177,8 @@ pub fn set_map(ecs : &mut World, new_map : String) {
 
         deserialize_individually!(ecs, de, d, Position, Renderable, Player, Viewshed, Monster,
             Name, BlocksTile, CombatStats, SufferDamage, WantsToMelee, Item, Consumable, Ranged, InflictDamage,
-            AreaOfEffect, Confusion, ProvidesHealing, InBackpack, WantsToPickupItem, WantsToUseItem,
-            WantsToDropItem, SerializationHelper, Equippable, Equipped, MeleePowerBonus, DefenseBonus
+            AreaOfEffect, Confusion, ProvidesHealing, WantsToPickupItem, WantsToUseItem,
+            WantsToDropItem, SerializationHelper
         );
     }
 
