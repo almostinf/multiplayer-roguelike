@@ -2,12 +2,12 @@ use rltk::{VirtualKeyCode, Rltk, Point};
 use specs::prelude::*;
 use crate::{RunState, CombatStats, WantsToMelee, GameLog, Monster};
 
-use super::{Position, Player, TileType, State, Viewshed, Map, Item, WantsToPickupItem, Client};
+use super::{Position, Player, TileType, State, Viewshed, Map, Item, WantsToPickupItem, ClientHandler};
 use super::{xy_idx};
 use std::cmp::{min, max};
 
 
-pub fn try_move_player(game_client : &mut Client, delta_x : i32, delta_y : i32, ecs : &mut World) {
+pub fn try_move_player(name : &String, game_client : &mut ClientHandler, delta_x : i32, delta_y : i32, ecs : &mut World) {
     let mut positions = ecs.write_storage::<Position>();
     let mut players = ecs.write_storage::<Player>();
     let mut viewsheds = ecs.write_storage::<Viewshed>();
@@ -15,12 +15,12 @@ pub fn try_move_player(game_client : &mut Client, delta_x : i32, delta_y : i32, 
     let map = ecs.fetch::<Map>();
     let entities = ecs.entities();
     let mut wants_to_melee = ecs.write_storage::<WantsToMelee>();
-
+    
     for (entity, _player, pos, viewshed) in (&entities, &mut players, &mut positions, &mut viewsheds).join() {
         if pos.x + delta_x < 1 || pos.x + delta_x > map.width-1 || pos.y + delta_y < 1 || pos.y + delta_y > map.height-1 { return; }
         let destination_idx = xy_idx(pos.x + delta_x, pos.y + delta_y);
 
-        let message = format!("{{\"__MESSAGE__\":\"main {}\"}}", destination_idx).as_bytes().to_vec();
+        let message = format!("{{\"__MESSAGE__\":\"{} {}\"}}", name, destination_idx).as_bytes().to_vec();
         game_client.send_message(message);
 
         for potential_target in map.tile_content[destination_idx].iter() {
@@ -91,23 +91,23 @@ pub fn player_input(gs : &mut State, ctx : &mut Rltk) -> RunState {
         },
         Some(key) => match key {
             VirtualKeyCode::Left |
-            VirtualKeyCode::A => try_move_player(&mut gs.game_client, -1, 0, &mut gs.ecs),
+            VirtualKeyCode::A => try_move_player(&gs.player_name, &mut gs.game_client, -1, 0, &mut gs.ecs),
             VirtualKeyCode::Right |
-            VirtualKeyCode::D => try_move_player(&mut gs.game_client, 1, 0, &mut gs.ecs),
+            VirtualKeyCode::D => try_move_player(&gs.player_name, &mut gs.game_client, 1, 0, &mut gs.ecs),
             VirtualKeyCode::Up |
-            VirtualKeyCode::W => try_move_player(&mut gs.game_client, 0, -1, &mut gs.ecs),
+            VirtualKeyCode::W => try_move_player(&gs.player_name, &mut gs.game_client, 0, -1, &mut gs.ecs),
             VirtualKeyCode::Down |
-            VirtualKeyCode::S => try_move_player(&mut gs.game_client, 0, 1, &mut gs.ecs),
+            VirtualKeyCode::S => try_move_player(&gs.player_name, &mut gs.game_client, 0, 1, &mut gs.ecs),
 
             // Diagonals
             VirtualKeyCode::Numpad9 | 
-            VirtualKeyCode::E => try_move_player(&mut gs.game_client, 1, -1, &mut gs.ecs),
+            VirtualKeyCode::E => try_move_player(&gs.player_name, &mut gs.game_client, 1, -1, &mut gs.ecs),
             VirtualKeyCode::Numpad7 |
-            VirtualKeyCode::Q => try_move_player(&mut gs.game_client, -1, -1, &mut gs.ecs),
+            VirtualKeyCode::Q => try_move_player(&gs.player_name, &mut gs.game_client, -1, -1, &mut gs.ecs),
             VirtualKeyCode::Numpad3 |
-            VirtualKeyCode::C => try_move_player(&mut gs.game_client, 1, 1, &mut gs.ecs),
+            VirtualKeyCode::C => try_move_player(&gs.player_name, &mut gs.game_client, 1, 1, &mut gs.ecs),
             VirtualKeyCode::Numpad1 |
-            VirtualKeyCode::Z => try_move_player(&mut gs.game_client, -1, 1, &mut gs.ecs),
+            VirtualKeyCode::Z => try_move_player(&gs.player_name, &mut gs.game_client, -1, 1, &mut gs.ecs),
             
             // Picking up items
             VirtualKeyCode::G => get_item(&mut gs.ecs),

@@ -1,4 +1,4 @@
-use rltk::{Rltk, GameState, Point};
+use rltk::{Rltk, GameState, Point, RGB};
 use specs::prelude::*;
 
 mod map;
@@ -40,10 +40,9 @@ pub use enemies::*;
 
 use crate::saveload_system::{save_map, set_map};
 
-const NAME : &str = "main";
-
 #[derive(PartialEq, Copy, Clone)]
 pub enum RunState {
+    EnteringName,
     AwaitingInput, 
     PreRun, 
     PlayerTurn,
@@ -65,7 +64,8 @@ pub enum RunState {
 
 pub struct State {
     pub ecs : World,
-    pub game_client : Client,
+    pub game_client : ClientHandler,
+    pub player_name : String,
     pub enemies : Vec<String>,
 }
 
@@ -78,6 +78,7 @@ impl GameState for State {
             let runstate = self.ecs.fetch::<RunState>();
             newrunstate = *runstate;
         }
+
         match newrunstate {
             RunState::MainMenu {..} => {}
             _ => {
@@ -102,12 +103,37 @@ impl GameState for State {
         }
 
         match newrunstate {
+            RunState::EnteringName => {
+                self.run_systems();
+                self.ecs.maintain();
+                match gui::entering_name(ctx, &mut self.player_name) {
+                    Ok(_) => {
+                        // check if this name is used or not
+                        let message = format!("{{\"__IS_NAME__\":\"{}\"}}", self.player_name).as_bytes().to_vec();
+                        self.game_client.send_message(message);
+
+                        let response = self.game_client.get_messages("__IS_NAME__".to_string());
+
+                        if !response.is_empty() {
+                            if response[0].1 == "T" {
+                                newrunstate = RunState::PreRun;
+                            } else if response[0].1 == "F" {
+                                ctx.print_color_centered(15, RGB::named(rltk::RED), RGB::named(rltk::BLACK), "This name is used. Please enter another");
+                                self.player_name.clear();
+                            }
+                        }
+                    }
+                    Err(_) => ()
+                }
+            }
             RunState::PreRun => {
                 self.run_systems();
                 self.ecs.maintain();
                 newrunstate = RunState::AwaitingInput;
             }
             RunState::AwaitingInput => {
+                self.run_systems();
+                self.ecs.maintain();
                 newrunstate = player_input(self, ctx);
             }
             RunState::PlayerTurn => {
@@ -257,30 +283,32 @@ impl State {
 
     fn get_enemies_pos(&mut self) -> Vec<(String, i32)> {
         let mut enemies_pos = Vec::<(String, i32)>::new();
-        let (key, value) = match self.game_client.get_message() {
-            Ok((key, value)) => (key, value),
-            Err(..) => ("".to_string(), "".to_string()),
-        };
-        if key == "_MESSAGE__" {
+
+        let response = self.game_client.get_messages("__MESSAGE__".to_string());
+
+        for (_, value) in response {
             let split = value.split(' ');
             let v = split.collect::<Vec<&str>>();
             let name = v[0].to_string();
             let name_check = name.clone();
             let idx = v[1].parse::<i32>().unwrap();
-            let mut check = false;
+            println!("Name: {}, idx: {}", name, idx);
+
             for n in self.enemies.iter() {
-                if name == *n && name != NAME {
+                if name == *n && name != self.player_name {
                     enemies_pos.push((name, idx));
-                    check = true;
                     break;
                 }
             }
-            if !check {
+
+            if !self.enemies.contains(&name_check) && name_check != self.player_name {
+                self.enemies.push(name_check.clone());
                 let x = idx_xy(idx).0;
                 let y = idx_xy(idx).1;
                 spawner::enemy(&mut self.ecs, x, y, name_check);
             }
         }
+ 
         enemies_pos
     }
 
@@ -430,15 +458,11 @@ fn main() -> rltk::BError {
 
     let map = Map::new(1);
     let (player_x, player_y) = map.rooms[0].center();
-    
-    // let message = format!("{{\"__MESSAGE__\":\"Pos: {} {}\"}}", player_x, player_y).as_bytes().to_vec();
-    // game_client.send_message(message);
-    // let (key, value) = game_client.get_message().unwrap();
-    // println!("{} {}", key, value);
 
     let mut gs = State{ 
         ecs : World::new(),
-        game_client : Client::new(Url::parse("ws://127.0.0.1:6881").expect("Address error")),
+        game_client : ClientHandler::new(Url::parse("ws://127.0.0.1:6881").expect("Address error")),
+        player_name : String::new(),
         enemies : Vec::<String>::new(),
     };
 
@@ -470,10 +494,10 @@ fn main() -> rltk::BError {
     gs.ecs.register::<MeleePowerBonus>();
     gs.ecs.register::<DefenseBonus>();
     gs.ecs.register::<WantsToRemoveItem>();
+    gs.ecs.register::<Enemy>();
     
 
     gs.ecs.insert(SimpleMarkerAllocator::<SerializeMe>::new());
-
 
     let player_entity = spawner::player(&mut gs.ecs, player_x, player_y);
     gs.ecs.insert(rltk::RandomNumberGenerator::new());
@@ -485,31 +509,26 @@ fn main() -> rltk::BError {
     gs.ecs.insert(map);
     gs.ecs.insert(Point::new(player_x, player_y));
     gs.ecs.insert(player_entity);
-    gs.ecs.insert(RunState::PreRun);
-    gs.ecs.insert(GameLog{ entries : vec!["Welcome to Rusty Roguelike".to_string()] });
+    gs.ecs.insert(RunState::EnteringName);
+    gs.ecs.insert(GameLog { entries : vec!["Welcome to Rusty Roguelike".to_string()] });
 
     let message = format!("{{\"__IS_MAP__\":\"{}\"}}", 1).as_bytes().to_vec();
     gs.game_client.send_message(message);
 
-    loop {
-        let (key, value) = gs.game_client.get_message().unwrap();
-        if key == "_IS_MAP__" {
-            if value == "F" {
-                let new_map = save_map(&mut gs.ecs);
-                let message = format!("{{\"__MAP__\":\"{}\"}}", new_map).as_bytes().to_vec();
-                println!("message size: {}", message.len());
-                gs.game_client.send_message(message);
-            } else {
-                set_map(&mut gs.ecs, value);
-            }
-            break;
+    let response = gs.game_client.get_messages("__IS_MAP__".to_string());
+    println!("{} {}", response[0].0, response[0].1);
+
+    if !response.is_empty() {
+        if response[0].1 == "F" {
+            let new_map = save_map(&mut gs.ecs);
+            let message = format!("{{\"__MAP__\":\"{}\"}}", new_map).as_bytes().to_vec();
+            println!("message size: {}", message.len());
+            gs.game_client.send_message(message);
+        } else {
+            println!("I am setting map: {}", response[0].1.len());
+            set_map(&mut gs.ecs, response[0].1.clone());
         }
     }
-
-    // if gs.game_client.socket.can_read() {
-    //     let (key, value) = gs.game_client.get_message().unwrap();
-    //     println!("{} {}", key, value);
-    // }
 
     rltk::main_loop(context, gs)
 }

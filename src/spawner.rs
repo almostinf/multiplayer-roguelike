@@ -35,8 +35,8 @@ pub fn enemy(ecs: &mut World, enemy_x: i32, enemy_y: i32, enemy_name: String) ->
     ecs.create_entity()
         .with(Position{x: enemy_x, y: enemy_y})
         .with(Renderable {
-            glyph: rltk::to_cp437('&'),
-            fg: RGB::named(rltk::DARKBLUE),
+            glyph: rltk::to_cp437('$'),
+            fg: RGB::named(rltk::BLUE),
             bg: RGB::named(rltk::BLACK),
             render_order: 1,
         })

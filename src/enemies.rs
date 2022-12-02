@@ -3,6 +3,7 @@ use crate::{idx_xy};
 
 use super::{Position, Name, Enemy};
 
+#[derive(Default)]
 pub struct EnemySystem {
     pub enemies_pos : Vec<(String, i32)>,
 }

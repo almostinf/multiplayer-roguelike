@@ -1,3 +1,6 @@
+use std::thread;
+use std::time::Duration;
+
 use rltk::{RGB, Rltk, Point, VirtualKeyCode};
 use specs::prelude::*;
 use crate::{RunState, Equipped};
@@ -367,15 +370,67 @@ pub enum GameOverResult {
     QuitToMenu,
 }
 
-pub fn game_over(ctx : &mut Rltk) -> GameOverResult{
+pub fn game_over(ctx : &mut Rltk) -> GameOverResult {
     ctx.print_color_centered(15, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "Your journey has ended!");
     ctx.print_color_centered(17, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK), "One day, we'll tell you all about how you did.");
     ctx.print_color_centered(18, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK), "That day, sadly, is not in this chapter..");
 
     ctx.print_color_centered(20, RGB::named(rltk::MAGENTA), RGB::named(rltk::BLACK), "Press any key to return to the menu");
 
+    thread::sleep(Duration::from_secs(1));
+
     match ctx.key {
         None => GameOverResult::NoSelection,
         Some(_) => GameOverResult::QuitToMenu,
     }
+}
+
+pub fn entering_name<'a>(ctx : &mut Rltk, name : &'a mut String) -> Result<&'a String, ()> {
+
+    ctx.print_color_centered(5, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "Please Enter your name");
+
+    match ctx.key {
+        Some(key) => {
+            match key {
+                VirtualKeyCode::A => (*name).push('a'),
+                VirtualKeyCode::B => (*name).push('b'),
+                VirtualKeyCode::C => (*name).push('c'),
+                VirtualKeyCode::D => (*name).push('d'),
+                VirtualKeyCode::E => (*name).push('e'),
+                VirtualKeyCode::F => (*name).push('g'),
+                VirtualKeyCode::G => (*name).push('g'),
+                VirtualKeyCode::H => (*name).push('h'),
+                VirtualKeyCode::I => (*name).push('i'),
+                VirtualKeyCode::J => (*name).push('j'),
+                VirtualKeyCode::K => (*name).push('k'),
+                VirtualKeyCode::L => (*name).push('l'),
+                VirtualKeyCode::M => (*name).push('m'),
+                VirtualKeyCode::N => (*name).push('n'),
+                VirtualKeyCode::O => (*name).push('o'),
+                VirtualKeyCode::P => (*name).push('p'),
+                VirtualKeyCode::Q => (*name).push('q'),
+                VirtualKeyCode::R => (*name).push('r'),
+                VirtualKeyCode::S => (*name).push('s'),
+                VirtualKeyCode::T => (*name).push('t'),
+                VirtualKeyCode::U => (*name).push('u'),
+                VirtualKeyCode::V => (*name).push('v'),
+                VirtualKeyCode::W => (*name).push('w'),
+                VirtualKeyCode::X => (*name).push('x'),
+                VirtualKeyCode::Y => (*name).push('y'),
+                VirtualKeyCode::Z => (*name).push('z'),
+                VirtualKeyCode::Back => {
+                    if !name.is_empty() {
+                        name.pop();
+                    }
+                }
+                VirtualKeyCode::Escape => return Ok(name),
+                _ => ctx.print_color_centered(12, RGB::named(rltk::RED), RGB::named(rltk::BLACK), "Error!"),
+            }
+        }
+        None => (),
+    }
+    ctx.print_color_centered(7, RGB::named(rltk::WHITESMOKE), RGB::named(rltk::BLACK), format!("Your current name: {}", name));
+    ctx.print_color_centered(9, RGB::named(rltk::ORANGE), RGB::named(rltk::BLACK), "Esc to save");
+
+    Err(())
 }
