@@ -1,5 +1,6 @@
 use std::thread;
 use std::time::Duration;
+use std::cmp;
 
 use rltk::{RGB, Rltk, Point, VirtualKeyCode};
 use specs::prelude::*;
@@ -290,8 +291,10 @@ pub fn remove_item_menu(gs : &mut State, ctx : &mut Rltk) ->  (ItemMenuResult, O
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum MainMenuSelection {
-    NewGame,
+    Play,
+    SaveGame,
     LoadGame,
+    Rating,
     Quit,
 }
 
@@ -307,29 +310,38 @@ pub enum MainMenuResult {
 
 pub fn main_menu(gs : &mut State, ctx : &mut Rltk) -> MainMenuResult {
     let runstate = gs.ecs.fetch::<RunState>();
-    let save_exists = super::saveload_system::does_save_exist();
 
     ctx.print_color_centered(15, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "Mutliplayer Roguelike");
 
     if let RunState::MainMenu { menu_selection : selection } = *runstate {
-        if selection == MainMenuSelection::NewGame {
-            ctx.print_color_centered(24, RGB::named(rltk::MAGENTA), RGB::named(rltk::BLACK), "Begin New Game");
+        if selection == MainMenuSelection::Play {
+            ctx.print_color_centered(24, RGB::named(rltk::MAGENTA), RGB::named(rltk::BLACK), "Play");
         } else {
-            ctx.print_color_centered(24, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK), "Begin New Game");
+            ctx.print_color_centered(24, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK), "Play");
         }
         
-        if save_exists {
-            if selection == MainMenuSelection::LoadGame {
-                ctx.print_color_centered(25, RGB::named(rltk::MAGENTA), RGB::named(rltk::BLACK), "Load Game");
-            } else {
-                ctx.print_color_centered(25, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK), "Load Game");
-            }
+        if selection == MainMenuSelection::SaveGame {
+            ctx.print_color_centered(26, RGB::named(rltk::MAGENTA), RGB::named(rltk::BLACK), "Save Game");
+        } else {
+            ctx.print_color_centered(26, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK), "Save Game");
+        }
+
+        if selection == MainMenuSelection::LoadGame {
+            ctx.print_color_centered(28, RGB::named(rltk::MAGENTA), RGB::named(rltk::BLACK), "Load Game");
+        } else {
+            ctx.print_color_centered(28, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK), "Load Game");
+        }
+
+        if selection == MainMenuSelection::Rating {
+            ctx.print_color_centered(30, RGB::named(rltk::MAGENTA), RGB::named(rltk::BLACK), "Rating");
+        } else {
+            ctx.print_color_centered(30, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK), "Rating");
         }
 
         if selection == MainMenuSelection::Quit {
-            ctx.print_color_centered(26, RGB::named(rltk::MAGENTA), RGB::named(rltk::BLACK), "Quit");
+            ctx.print_color_centered(32, RGB::named(rltk::MAGENTA), RGB::named(rltk::BLACK), "Quit");
         } else {
-            ctx.print_color_centered(26, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK), "Quit");
+            ctx.print_color_centered(32, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK), "Quit");
         }
 
         match ctx.key {
@@ -340,18 +352,22 @@ pub fn main_menu(gs : &mut State, ctx : &mut Rltk) -> MainMenuResult {
                     VirtualKeyCode::Up => {
                         let newselection;
                         match selection {
-                            MainMenuSelection::NewGame => newselection = MainMenuSelection::Quit,
-                            MainMenuSelection::LoadGame => newselection = MainMenuSelection::NewGame,
-                            MainMenuSelection::Quit => newselection = MainMenuSelection::LoadGame,
+                            MainMenuSelection::Play => newselection = MainMenuSelection::Quit,
+                            MainMenuSelection::SaveGame => newselection = MainMenuSelection::Play,
+                            MainMenuSelection::LoadGame => newselection = MainMenuSelection::SaveGame,
+                            MainMenuSelection::Rating => newselection = MainMenuSelection::LoadGame,
+                            MainMenuSelection::Quit => newselection = MainMenuSelection::Rating,
                         }
                         return MainMenuResult::NoSelection { selected : newselection }
                     }
                     VirtualKeyCode::Down => {
                         let newselection;
                         match selection {
-                            MainMenuSelection::NewGame => newselection = MainMenuSelection::LoadGame,
-                            MainMenuSelection::LoadGame => newselection = MainMenuSelection::Quit,
-                            MainMenuSelection::Quit => newselection = MainMenuSelection::NewGame,
+                            MainMenuSelection::Play => newselection = MainMenuSelection::SaveGame,
+                            MainMenuSelection::SaveGame => newselection = MainMenuSelection::LoadGame,
+                            MainMenuSelection::LoadGame => newselection = MainMenuSelection::Rating,
+                            MainMenuSelection::Rating => newselection = MainMenuSelection::Quit,
+                            MainMenuSelection::Quit => newselection = MainMenuSelection::Play,
                         }
                         return MainMenuResult::NoSelection { selected : newselection }
                     }
@@ -361,7 +377,7 @@ pub fn main_menu(gs : &mut State, ctx : &mut Rltk) -> MainMenuResult {
             }
         }
     }
-    MainMenuResult::NoSelection { selected : MainMenuSelection::NewGame }
+    MainMenuResult::NoSelection { selected : MainMenuSelection::Play }
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -377,7 +393,7 @@ pub fn game_over(ctx : &mut Rltk) -> GameOverResult {
 
     ctx.print_color_centered(20, RGB::named(rltk::MAGENTA), RGB::named(rltk::BLACK), "Press any key to return to the menu");
 
-    thread::sleep(Duration::from_secs(1));
+    thread::sleep(Duration::from_millis(200));
 
     match ctx.key {
         None => GameOverResult::NoSelection,
@@ -433,4 +449,54 @@ pub fn entering_name<'a>(ctx : &mut Rltk, name : &'a mut String) -> Result<&'a S
     ctx.print_color_centered(9, RGB::named(rltk::ORANGE), RGB::named(rltk::BLACK), "Esc to save");
 
     Err(())
+}
+
+// Need for testing
+pub fn show_rating(gs: &mut State, ctx: &mut Rltk) -> ItemMenuResult {
+    let message = b"{\"__RATING__\":\"\"}".to_vec();
+    gs.game_client.send_message(message);
+
+    let response = gs.game_client.get_messages("__RATING__".to_string());
+
+    let mut r = Vec::<(String, i32)>::new();
+
+    if !response.is_empty() {
+        let value = &response[0].1;
+        let split = value.split(' ');
+        let v = split.collect::<Vec<&str>>();
+        for record in v {
+            let split = record.split(':');
+            let v = split.collect::<Vec<&str>>();
+            if v.len() > 1 {
+                let value = v[1].parse::<i32>().expect("Can't convert to number");
+                r.push((v[0].to_string(), value));
+            }
+        }
+    }
+    
+    // sorting vector by second value from high to low (level)
+    r.sort_by_key(|k| cmp::Reverse(k.1));
+
+    let count = r.len();
+
+    let y = (25 - (count / 2)) as i32;
+    ctx.draw_box(15, y - 2, 31, (count + 3) as i32, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK));
+    ctx.print_color(18, y - 2, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "Rating");
+    ctx.print_color(18, y + count as i32 + 1, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "ESCAPE to cancel");
+
+    let mut x = 20;
+    for record in r {
+        ctx.print_color(x, y, RGB::named(rltk::AQUA), RGB::named(rltk::BLACK), format!("{}: {}", record.0, record.1));
+        x += 1;
+    }
+
+    match ctx.key {
+        None => ItemMenuResult::NoResponse,
+        Some(key) => {
+            match key {
+                VirtualKeyCode::Escape => ItemMenuResult::Cancel,
+                _ => ItemMenuResult::NoResponse,
+            }
+        }
+    }
 }

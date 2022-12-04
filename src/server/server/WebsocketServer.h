@@ -74,6 +74,7 @@ class WebsocketServer
 		
 		std::vector<std::string> maps;
 		std::vector<std::string> names;
+		std::map<std::string, std::string> rating;
 		
 		void onOpen(ClientConnection conn);
 		void onClose(ClientConnection conn);

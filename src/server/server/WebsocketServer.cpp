@@ -10,7 +10,8 @@
 #define MAP_FIELD "__MAP__"
 #define IS_MAP_FIELD "__IS_MAP__"
 #define IS_NAME "__IS_NAME__"
-
+#define RATING "__RATING__"
+#define TRACK_ME "__TRACK_ME__"
 
 
 Json::Value WebsocketServer::parseJson(const string& json)
@@ -159,12 +160,15 @@ void WebsocketServer::onMessage(ClientConnection conn, WebsocketEndpoint::messag
 		else if (messageObject.isMember(IS_MAP_FIELD)) 
 		{
 			std::string messageType = messageObject[IS_MAP_FIELD].asString();
+
 			int num_of_map = std::stoi(messageType);
+
 			std::string response;
 			if (num_of_map <= this->maps.size())
 				response = maps[num_of_map - 1];
 			else 
 				response = "F";
+			
 			std::string key = IS_MAP_FIELD;
 			this->sendMessage(conn, response, key);
 		}
@@ -180,12 +184,48 @@ void WebsocketServer::onMessage(ClientConnection conn, WebsocketEndpoint::messag
 
 			if (std::find(names.begin(), names.end(), messageType) != names.end()) {
 				response = "F";
-			} else {
+			} 
+			else {
 				response = "T";
 				names.push_back(messageType);
 			}
 			std::string key = IS_NAME;
 			this->sendMessage(conn, response, key);
+		}
+		else if (messageObject.isMember(RATING)) {
+			std::string response;
+			for (auto const& player : rating) {
+				response.append(player.first);
+				response.push_back(':');
+				response.append(player.second);
+				response.push_back(' ');
+			}
+			std::string key = RATING;
+			this->sendMessage(conn, response, key);
+		}
+		else if (messageObject.isMember(TRACK_ME)) {
+			std::string messageType = messageObject[TRACK_ME].asString();
+			std::string name;
+			std::string num;
+			bool check = false;
+			for (auto ch : messageType) {
+				if (ch == ' ') {
+					check = true;
+				}
+				else if (!check) {
+					name.push_back(ch);
+				} 
+				else {
+					num.push_back(ch);
+				}
+			}
+
+			if (rating.find(name) == rating.end()) {
+				rating.insert(std::make_pair(name, num));
+			} 
+			else {
+				rating[name] = num;
+			}
 		}
 	}
 }

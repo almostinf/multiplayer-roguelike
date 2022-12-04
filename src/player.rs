@@ -7,7 +7,7 @@ use super::{xy_idx};
 use std::cmp::{min, max};
 
 
-pub fn try_move_player(name : &String, game_client : &mut ClientHandler, delta_x : i32, delta_y : i32, ecs : &mut World) {
+pub fn try_move_player(current_depth : i32, name : &String, game_client : &mut ClientHandler, delta_x : i32, delta_y : i32, ecs : &mut World) {
     let mut positions = ecs.write_storage::<Position>();
     let mut players = ecs.write_storage::<Player>();
     let mut viewsheds = ecs.write_storage::<Viewshed>();
@@ -20,7 +20,7 @@ pub fn try_move_player(name : &String, game_client : &mut ClientHandler, delta_x
         if pos.x + delta_x < 1 || pos.x + delta_x > map.width-1 || pos.y + delta_y < 1 || pos.y + delta_y > map.height-1 { return; }
         let destination_idx = xy_idx(pos.x + delta_x, pos.y + delta_y);
 
-        let message = format!("{{\"__MESSAGE__\":\"{} {}\"}}", name, destination_idx).as_bytes().to_vec();
+        let message = format!("{{\"__MESSAGE__\":\"{} {} {}\"}}", name, destination_idx, current_depth).as_bytes().to_vec();
         game_client.send_message(message);
 
         for potential_target in map.tile_content[destination_idx].iter() {
@@ -85,29 +85,36 @@ pub fn try_next_level(ecs : &mut World) -> bool {
 }
 
 pub fn player_input(gs : &mut State, ctx : &mut Rltk) -> RunState {
+
+    let current_depth;
+    {
+        let worldmap = gs.ecs.read_resource::<Map>();
+        current_depth = worldmap.depth;
+    }
+
     match ctx.key {
         None => {
             return RunState::AwaitingInput
         },
         Some(key) => match key {
             VirtualKeyCode::Left |
-            VirtualKeyCode::A => try_move_player(&gs.player_name, &mut gs.game_client, -1, 0, &mut gs.ecs),
+            VirtualKeyCode::A => try_move_player(current_depth, &gs.player_name, &mut gs.game_client, -1, 0, &mut gs.ecs),
             VirtualKeyCode::Right |
-            VirtualKeyCode::D => try_move_player(&gs.player_name, &mut gs.game_client, 1, 0, &mut gs.ecs),
+            VirtualKeyCode::D => try_move_player(current_depth, &gs.player_name, &mut gs.game_client, 1, 0, &mut gs.ecs),
             VirtualKeyCode::Up |
-            VirtualKeyCode::W => try_move_player(&gs.player_name, &mut gs.game_client, 0, -1, &mut gs.ecs),
+            VirtualKeyCode::W => try_move_player(current_depth, &gs.player_name, &mut gs.game_client, 0, -1, &mut gs.ecs),
             VirtualKeyCode::Down |
-            VirtualKeyCode::S => try_move_player(&gs.player_name, &mut gs.game_client, 0, 1, &mut gs.ecs),
+            VirtualKeyCode::S => try_move_player(current_depth, &gs.player_name, &mut gs.game_client, 0, 1, &mut gs.ecs),
 
             // Diagonals
             VirtualKeyCode::Numpad9 | 
-            VirtualKeyCode::E => try_move_player(&gs.player_name, &mut gs.game_client, 1, -1, &mut gs.ecs),
+            VirtualKeyCode::E => try_move_player(current_depth, &gs.player_name, &mut gs.game_client, 1, -1, &mut gs.ecs),
             VirtualKeyCode::Numpad7 |
-            VirtualKeyCode::Q => try_move_player(&gs.player_name, &mut gs.game_client, -1, -1, &mut gs.ecs),
+            VirtualKeyCode::Q => try_move_player(current_depth, &gs.player_name, &mut gs.game_client, -1, -1, &mut gs.ecs),
             VirtualKeyCode::Numpad3 |
-            VirtualKeyCode::C => try_move_player(&gs.player_name, &mut gs.game_client, 1, 1, &mut gs.ecs),
+            VirtualKeyCode::C => try_move_player(current_depth, &gs.player_name, &mut gs.game_client, 1, 1, &mut gs.ecs),
             VirtualKeyCode::Numpad1 |
-            VirtualKeyCode::Z => try_move_player(&gs.player_name, &mut gs.game_client, -1, 1, &mut gs.ecs),
+            VirtualKeyCode::Z => try_move_player(current_depth, &gs.player_name, &mut gs.game_client, -1, 1, &mut gs.ecs),
             
             // Picking up items
             VirtualKeyCode::G => get_item(&mut gs.ecs),
