@@ -4,6 +4,7 @@
 #include <functional>
 #include <iostream>
 
+
 //The name of the special JSON field that holds the message type for messages
 #define MESSAGE_FIELD "__MESSAGE__"
 #define CONNECTION_FIELD "__CONN__"
@@ -12,6 +13,7 @@
 #define IS_NAME "__IS_NAME__"
 #define RATING "__RATING__"
 #define TRACK_ME "__TRACK_ME__"
+#define CHANGE "__CHANGE__"
 
 
 Json::Value WebsocketServer::parseJson(const string& json)
@@ -161,13 +163,15 @@ void WebsocketServer::onMessage(ClientConnection conn, WebsocketEndpoint::messag
 		{
 			std::string messageType = messageObject[IS_MAP_FIELD].asString();
 
-			int num_of_map = std::stoi(messageType);
+			size_t num_of_map = std::stoi(messageType);
 
 			std::string response;
 			if (num_of_map <= this->maps.size())
 				response = maps[num_of_map - 1];
 			else 
 				response = "F";
+
+			// std::cout << num_of_map << '\n';
 			
 			std::string key = IS_MAP_FIELD;
 			this->sendMessage(conn, response, key);
@@ -178,7 +182,8 @@ void WebsocketServer::onMessage(ClientConnection conn, WebsocketEndpoint::messag
 			std::string messageType = source.substr(12, source.size() - 13 - 1);
 			maps.push_back(messageType);
 		}
-		else if (messageObject.isMember(IS_NAME)) {
+		else if (messageObject.isMember(IS_NAME)) 
+		{
 			std::string messageType = messageObject[IS_NAME].asString();
 			std::string response;
 
@@ -226,6 +231,12 @@ void WebsocketServer::onMessage(ClientConnection conn, WebsocketEndpoint::messag
 			else {
 				rating[name] = num;
 			}
+		}
+		else if (messageObject.isMember(CHANGE)) {
+			std::string messageType = messageObject[CHANGE].asString();
+			messageObject.removeMember(CHANGE);
+			std::string key = CHANGE;
+			this->broadcastMessage(messageType, key);
 		}
 	}
 }
