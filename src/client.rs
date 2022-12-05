@@ -6,6 +6,7 @@ use websocket::{ClientBuilder, Message, sync::Client};
 
 pub struct ClientHandler {
     socket : Client<TcpStream>,
+    pub messages : Vec<(String, String)>,
 }
 
 
@@ -23,12 +24,11 @@ impl ClientHandler {
 
         ClientHandler {
             socket : client,
+            messages : Vec::<(String, String)>::new(),
         }
     }
 
-    pub fn get_messages(&mut self, need_key : String) -> Vec<(String, String)> {
-
-        let mut all_messages = Vec::<(String, String)>::new();
+    pub fn get_messages(&mut self) {
 
         for msg in self.socket.incoming_messages() {
             match msg {
@@ -68,7 +68,8 @@ impl ClientHandler {
                                     value.push(ch);
                                 }
                             }
-                            all_messages.push((key, value));
+                            println!("message: {} {}", key, value);
+                            self.messages.push((key, value));
                         }
                         _ => (),
                     }
@@ -77,9 +78,8 @@ impl ClientHandler {
             }
         }
 
-        let filtered_messages = all_messages.into_iter().filter(|(key, _)| *key == need_key).collect();
-        
-        filtered_messages
+        // let filtered_messages = all_messages.into_iter().filter(|(key, _)| *key == need_key).collect::<Vec<_>>();
+
     }
 
     pub fn send_message(&mut self, msg : Vec<u8>) {

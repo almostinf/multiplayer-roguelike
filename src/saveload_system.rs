@@ -63,7 +63,7 @@ pub fn save_map(ecs : &mut World) -> String {
         serialize_individually!(ecs, serializer, data, Position, Renderable, Player, Viewshed, Monster,
             Name, BlocksTile, CombatStats, SufferDamage, WantsToMelee, Item, Consumable, Ranged, InflictDamage,
             AreaOfEffect, Confusion, ProvidesHealing, WantsToPickupItem, WantsToUseItem,
-            WantsToDropItem, SerializationHelper
+            WantsToDropItem, SerializationHelper, Equippable, MeleePowerBonus, DefenseBonus
         );
     }
 
@@ -109,7 +109,7 @@ pub fn load_game(ecs : &mut World) {
 
     let data = fs::read_to_string("./savegame.json").unwrap();
     println!("data size: {}", data.len());
-    
+
     let mut de = serde_json::Deserializer::from_str(&data);
 
     {
@@ -175,7 +175,7 @@ pub fn set_map(ecs : &mut World, new_map : String) {
         deserialize_individually!(ecs, de, d, Position, Renderable, Player, Viewshed, Monster,
             Name, BlocksTile, CombatStats, SufferDamage, WantsToMelee, Item, Consumable, Ranged, InflictDamage,
             AreaOfEffect, Confusion, ProvidesHealing, WantsToPickupItem, WantsToUseItem,
-            WantsToDropItem, SerializationHelper
+            WantsToDropItem, SerializationHelper, Equippable, MeleePowerBonus, DefenseBonus
         );
     }
 

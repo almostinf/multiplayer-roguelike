@@ -6,8 +6,10 @@ use super::{CombatStats, SufferDamage};
 pub struct DamageSystem {}
 
 impl<'a> System<'a> for DamageSystem {
-    type SystemData = ( WriteStorage<'a, CombatStats>,
-                        WriteStorage<'a, SufferDamage> );
+    type SystemData = ( 
+                        WriteStorage<'a, CombatStats>,
+                        WriteStorage<'a, SufferDamage> 
+                    );
 
     fn run(&mut self, data : Self::SystemData) {
         let (mut stats, mut damage) = data;
@@ -23,7 +25,7 @@ impl<'a> System<'a> for DamageSystem {
 pub fn delete_the_dead(ecs : &mut World) {
     let mut dead : Vec<Entity> = Vec::new();
 
-    //Using a scope to make borrow checker happy
+    // Using a scope to make borrow checker happy
     {
         let combat_stats = ecs.read_storage::<CombatStats>();
         let entities = ecs.entities();

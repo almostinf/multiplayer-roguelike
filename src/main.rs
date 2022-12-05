@@ -74,6 +74,10 @@ impl GameState for State {
     fn tick(&mut self, ctx : &mut Rltk) {
         ctx.cls();
 
+        self.game_client.get_messages();
+
+        self.delete_enemies();
+
         let mut newrunstate;
         {
             let runstate = self.ecs.fetch::<RunState>();
@@ -113,10 +117,12 @@ impl GameState for State {
                         let message = format!("{{\"__IS_NAME__\":\"{}\"}}", self.player_name).as_bytes().to_vec();
                         self.game_client.send_message(message);
 
-                        let response = self.game_client.get_messages("__IS_NAME__".to_string());
+                        let clone = self.game_client.messages.clone();
+                        let response = clone.into_iter().filter(|(key, _)| *key == "__IS_NAME__").collect::<Vec<_>>();
 
                         if !response.is_empty() {
                             if response[0].1 == "T" {
+                                println!("in true result\n");
                                 let message = format!("{{\"__TRACK_ME__\":\"{} {}\"}}", self.player_name, 1).as_bytes().to_vec();
                                 self.game_client.send_message(message);
                                 newrunstate = RunState::PreRun;
@@ -266,6 +272,9 @@ impl GameState for State {
 
         damage_system::delete_the_dead(&mut self.ecs);
 
+        if self.game_client.messages.len() > 1 && newrunstate != RunState::EnteringName {
+            self.game_client.messages.clear();
+        }
     }
 }
 
@@ -298,6 +307,7 @@ impl State {
         item_remove.run_now(&self.ecs);
 
         self.ecs.maintain();
+
     }
 
     fn get_enemies_pos(&mut self) -> Vec<(String, i32)> {
@@ -310,7 +320,8 @@ impl State {
 
         let mut enemies_pos = Vec::<(String, i32)>::new();
 
-        let response = self.game_client.get_messages("__MESSAGE__".to_string());
+        let clone = self.game_client.messages.clone();
+        let response = clone.into_iter().filter(|(key, _)| *key == "__MESSAGE__").collect::<Vec<_>>();
 
         for (_, value) in response {
             let split = value.split(' ');
@@ -319,7 +330,7 @@ impl State {
             let name_check = name.clone();
             let idx = v[1].parse::<i32>().unwrap();
             let level = v[2].parse::<i32>().unwrap();
-            println!("Name: {}, idx: {}, level: {}", name, idx, level);
+            // println!("Name: {}, idx: {}, level: {}", name, idx, level);
 
             if current_depth == level {
                 for n in self.enemies.iter() {
@@ -339,6 +350,56 @@ impl State {
         }
  
         enemies_pos
+    }
+
+    fn delete_enemies(&mut self) {
+        let clone = self.game_client.messages.clone();
+        let response = clone.into_iter().filter(|(key, _)| *key == "__CHANGE__").collect::<Vec<_>>();
+
+        let mut to_remove = Vec::<(String, i32)>::new();
+
+        for (_, value) in response {
+            let split = value.split(' ');
+            let v = split.collect::<Vec<&str>>();
+            if v.len() > 1 {
+                println!("to delete: {} {}", v[0].to_string(), value);
+                let level = v[1].parse::<i32>().unwrap();
+                to_remove.push((v[0].to_string(), level));
+            }
+        }
+
+        let mut to_delete = Vec::<Entity>::new();
+
+        let current_depth;
+        {
+            let worldmap = self.ecs.read_resource::<Map>();
+            current_depth = worldmap.depth;
+        }
+
+        if !to_remove.is_empty() {
+            let enemies = self.ecs.read_storage::<Enemy>();
+            let names = self.ecs.read_storage::<Name>();
+            
+            let ents = enemies.fetched_entities();
+
+            for e in ents.join() {
+                let name = names.get(e).expect("Can't get name");
+                if to_remove.iter().find(|(_name, _level)| *_name == *name.name && *_level == current_depth) != None {
+                    to_delete.push(e);
+                    let index = self.enemies.iter().position(|x| *x == *name.name).expect("Can't find position");
+                    self.enemies.remove(index);
+
+                    for e in self.enemies.iter() {
+                        print!("{} ", e);
+                    }
+                    println!();
+                }
+            }
+        }
+
+        for e in to_delete {
+            self.ecs.delete_entity(e).expect("Can't delete enemy on level change");
+        }
     }
 
     fn entities_to_remove_on_level_change(&mut self) -> Vec<Entity> {
@@ -377,6 +438,10 @@ impl State {
                 to_delete.push(entity);
             }
         }
+
+        // clear all enemies on previous level
+        self.enemies.clear();
+
         to_delete
     }
 
@@ -396,7 +461,16 @@ impl State {
         let message = format!("{{\"__IS_MAP__\":\"{}\"}}", current_depth + 1).as_bytes().to_vec();
         self.game_client.send_message(message);
 
-        let response = self.game_client.get_messages("__IS_MAP__".to_string());
+        self.game_client.get_messages();
+        
+        let mut clone = self.game_client.messages.clone();
+        let mut response = clone.into_iter().filter(|(key, _)| *key == "__IS_MAP__").collect::<Vec<_>>();
+
+        while response.is_empty() {
+            self.game_client.get_messages();
+            clone = self.game_client.messages.clone();
+            response = clone.into_iter().filter(|(key, _)| *key == "__IS_MAP__").collect::<Vec<_>>();
+        }
 
         if !response.is_empty() {
             if response[0].1 == "F" {
@@ -466,6 +540,9 @@ impl State {
             }
 
             let message = format!("{{\"__TRACK_ME__\":\"{} {}\"}}", self.player_name, current_depth + 1).as_bytes().to_vec();
+            self.game_client.send_message(message);
+
+            let message = format!("{{\"__CHANGE__\":\"{} {}\"}}", self.player_name, current_depth).as_bytes().to_vec();
             self.game_client.send_message(message);
         }
     }
@@ -596,13 +673,24 @@ fn main() -> rltk::BError {
     let message = format!("{{\"__IS_MAP__\":\"{}\"}}", 1).as_bytes().to_vec();
     gs.game_client.send_message(message);
 
-    let response = gs.game_client.get_messages("__IS_MAP__".to_string());
+    gs.game_client.get_messages();
+
+    let mut clone = gs.game_client.messages.clone();
+
+    let mut response = clone.into_iter().filter(|(key, _)| *key == "__IS_MAP__").collect::<Vec<_>>();
+
+    while response.is_empty() {
+        gs.game_client.get_messages();
+        clone = gs.game_client.messages.clone();
+        response = clone.into_iter().filter(|(key, _)| *key == "__IS_MAP__").collect::<Vec<_>>();
+    }
 
     if !response.is_empty() {
         if response[0].1 == "F" {
             let new_map = save_map(&mut gs.ecs);
             let message = format!("{{\"__MAP__\":\"{}\"}}", new_map).as_bytes().to_vec();
             gs.game_client.send_message(message);
+            println!("send map");
         } else {
             println!("I am setting map: {}", response[0].1.len());
             set_map(&mut gs.ecs, response[0].1.clone());

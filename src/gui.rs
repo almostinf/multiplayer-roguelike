@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::thread;
 use std::time::Duration;
 use std::cmp;
@@ -439,7 +440,7 @@ pub fn entering_name<'a>(ctx : &mut Rltk, name : &'a mut String) -> Result<&'a S
                         name.pop();
                     }
                 }
-                VirtualKeyCode::Escape => return Ok(name),
+                VirtualKeyCode::Space => return Ok(name),
                 _ => ctx.print_color_centered(12, RGB::named(rltk::RED), RGB::named(rltk::BLACK), "Error!"),
             }
         }
@@ -456,8 +457,12 @@ pub fn show_rating(gs: &mut State, ctx: &mut Rltk) -> ItemMenuResult {
     let message = b"{\"__RATING__\":\"\"}".to_vec();
     gs.game_client.send_message(message);
 
-    let response = gs.game_client.get_messages("__RATING__".to_string());
+    let clone = gs.game_client.messages.clone();
 
+    let response = clone.into_iter().filter(|(key, _)| *key == "__RATING__").collect::<Vec<_>>();
+
+    println!("name resp size: {}", response.len());
+    
     let mut r = Vec::<(String, i32)>::new();
 
     if !response.is_empty() {
