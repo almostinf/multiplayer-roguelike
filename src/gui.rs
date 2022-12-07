@@ -1,14 +1,14 @@
-use std::borrow::Borrow;
 use std::thread;
 use std::time::Duration;
 use std::cmp;
 
 use rltk::{RGB, Rltk, Point, VirtualKeyCode};
 use specs::prelude::*;
-use crate::{RunState, Equipped};
 
-use crate::{CombatStats, Player, GameLog, Map, Name, Position, xy_idx, State, InBackpack, Viewshed};
+use crate::{CombatStats, Player, GameLog, Map, Name, Position, xy_idx, State, InBackpack, Viewshed, RunState, Equipped};
 
+
+/// Display level, hp, gamelog and mouse cursor
 pub fn draw_ui(ecs : &World, ctx : &mut Rltk) {
     ctx.draw_box(0, 43, 79, 6, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK));
 
@@ -26,7 +26,7 @@ pub fn draw_ui(ecs : &World, ctx : &mut Rltk) {
         y += 1;
     }
 
-    // Draw mouse cursor
+    // draw mouse cursor
     let mouse_pos = ctx.mouse_pos();
     ctx.set_bg(mouse_pos.0, mouse_pos.1, RGB::named(rltk::MAGENTA));
 
@@ -43,6 +43,9 @@ pub fn draw_ui(ecs : &World, ctx : &mut Rltk) {
     }
 }
 
+
+/// Display an arrow when hovering over the entity 
+/// and the following display of the name
 fn draw_tooltips(ecs : &World, ctx : &mut Rltk) {
     let map = ecs.fetch::<Map>();
     let names = ecs.read_storage::<Name>();
@@ -54,6 +57,7 @@ fn draw_tooltips(ecs : &World, ctx : &mut Rltk) {
     }
 
     let mut tooltip : Vec<String> = Vec::new();
+    // take all names on the chosen position
     for (name, position) in (&names, &positions).join() {
         let idx = xy_idx(position.x, position.y);
         if position.x == mouse_pos.0 && position.y == mouse_pos.1 && map.visible_tiles[idx] {
@@ -70,6 +74,7 @@ fn draw_tooltips(ecs : &World, ctx : &mut Rltk) {
         }
         width += 3;
 
+        // drawing arrow and name
         if mouse_pos.0 > 40 {
             let arrow_pos = Point::new(mouse_pos.0 - 2, mouse_pos.1);
             let left_x = mouse_pos.0 - width;
@@ -100,6 +105,8 @@ fn draw_tooltips(ecs : &World, ctx : &mut Rltk) {
     }
 }
 
+
+/// Store the abstract result of player's actions in the item box
 #[derive(PartialEq, Copy, Clone)]
 pub enum ItemMenuResult {
     Cancel, 
@@ -107,6 +114,8 @@ pub enum ItemMenuResult {
     Selected,
 }
 
+
+/// Display the inventory in a separate window and reacts to further actions of the player
 pub fn show_inventory(gs: &mut State, ctx: &mut Rltk) -> (ItemMenuResult, Option<Entity>) {
     let player_entity = gs.ecs.fetch::<Entity>();
     let names = gs.ecs.read_storage::<Name>();
@@ -121,6 +130,7 @@ pub fn show_inventory(gs: &mut State, ctx: &mut Rltk) -> (ItemMenuResult, Option
     ctx.print_color(18, y - 2, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "Inventory");
     ctx.print_color(18, y + count as i32 + 1, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "ESCAPE to cancel");
 
+    // draw all taken items
     let mut equippable : Vec<Entity> = Vec::new();
     let mut j = 0;
     for (entity, _pack, name) in (&entities, &backpack, &names).join().filter(|item| item.1.owner == *player_entity) {
@@ -153,6 +163,9 @@ pub fn show_inventory(gs: &mut State, ctx: &mut Rltk) -> (ItemMenuResult, Option
     }
 }
 
+
+/// Display items that can be thrown in a separate box and is responsible for the 
+/// player's further actions
 pub fn drop_item_menu(gs: &mut State, ctx: &mut Rltk) -> (ItemMenuResult, Option<Entity>) {
     let player_entity = gs.ecs.fetch::<Entity>();
     let names = gs.ecs.read_storage::<Name>();
@@ -199,6 +212,9 @@ pub fn drop_item_menu(gs: &mut State, ctx: &mut Rltk) -> (ItemMenuResult, Option
     }
 }
 
+
+/// Highlight all available cells, changes the color of the cursor 
+/// depending on the pointing and reacts to the next player's actions
 pub fn ranged_target(gs : &mut State, ctx : &mut Rltk, range : i32) -> (ItemMenuResult, Option<Point>) {
     let player_entity = gs.ecs.fetch::<Entity>();
     let player_pos = gs.ecs.fetch::<Point>();
@@ -222,7 +238,7 @@ pub fn ranged_target(gs : &mut State, ctx : &mut Rltk, range : i32) -> (ItemMenu
         return (ItemMenuResult::Cancel, None);
     }
 
-    // Draw mouse cursor
+    // draw mouse cursor
     let mouse_pos = ctx.mouse_pos();
     let mut valid_target = false;
     for idx in available_cells.iter() {
@@ -244,6 +260,9 @@ pub fn ranged_target(gs : &mut State, ctx : &mut Rltk, range : i32) -> (ItemMenu
     (ItemMenuResult::NoResponse, None)
 }
 
+
+/// Display items that can be remove in a separate box and is responsible for 
+/// the player's further actions
 pub fn remove_item_menu(gs : &mut State, ctx : &mut Rltk) ->  (ItemMenuResult, Option<Entity>) {
     let player_entity = gs.ecs.fetch::<Entity>();
     let names = gs.ecs.read_storage::<Name>();
@@ -253,11 +272,13 @@ pub fn remove_item_menu(gs : &mut State, ctx : &mut Rltk) ->  (ItemMenuResult, O
     let inventory = (&backpack, &names).join().filter(|item| item.0.owner == *player_entity);
     let count = inventory.count();
 
+    // drow box
     let mut y = (25 - (count / 2)) as i32;
     ctx.draw_box(15, y - 2, 31, (count + 3) as i32, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK));
     ctx.print_color(18, y - 2, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "Remove Which Item?");
     ctx.print_color(18, y + count as i32 + 1, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "ESCAPE to cancel");
 
+    // print all taken items
     let mut equippable : Vec<Entity> = Vec::new();
     let mut j = 0;
     for (entity, _pack, name) in (&entities, &backpack, &names).join() {
@@ -290,7 +311,9 @@ pub fn remove_item_menu(gs : &mut State, ctx : &mut Rltk) ->  (ItemMenuResult, O
     }
 }
 
+
 #[derive(PartialEq, Copy, Clone)]
+/// Store the abstract player's selections in the menu
 pub enum MainMenuSelection {
     Play,
     SaveGame,
@@ -299,7 +322,9 @@ pub enum MainMenuSelection {
     Quit,
 }
 
+
 #[derive(PartialEq, Copy, Clone)]
+/// Store the abstract result of player's actions in the menu
 pub enum MainMenuResult {
     NoSelection {
         selected : MainMenuSelection,
@@ -309,11 +334,14 @@ pub enum MainMenuResult {
     }
 }
 
+
+/// Display the main menu and reacts to the player's following actions
 pub fn main_menu(gs : &mut State, ctx : &mut Rltk) -> MainMenuResult {
     let runstate = gs.ecs.fetch::<RunState>();
 
     ctx.print_color_centered(15, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "Mutliplayer Roguelike");
 
+    // draw all variants of menu actions
     if let RunState::MainMenu { menu_selection : selection } = *runstate {
         if selection == MainMenuSelection::Play {
             ctx.print_color_centered(24, RGB::named(rltk::MAGENTA), RGB::named(rltk::BLACK), "Play");
@@ -381,12 +409,16 @@ pub fn main_menu(gs : &mut State, ctx : &mut Rltk) -> MainMenuResult {
     MainMenuResult::NoSelection { selected : MainMenuSelection::Play }
 }
 
+
 #[derive(PartialEq, Clone, Copy)]
+/// Store player's action after gameover
 pub enum GameOverResult {
     NoSelection, 
     QuitToMenu,
 }
 
+
+/// Display the text after the game ends and reacts to the player's following actions
 pub fn game_over(ctx : &mut Rltk) -> GameOverResult {
     ctx.print_color_centered(15, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "Your journey has ended!");
     ctx.print_color_centered(17, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK), "One day, we'll tell you all about how you did.");
@@ -402,6 +434,8 @@ pub fn game_over(ctx : &mut Rltk) -> GameOverResult {
     }
 }
 
+
+/// Responsible for entering the player's name and displaying it on the screen
 pub fn entering_name<'a>(ctx : &mut Rltk, name : &'a mut String) -> Result<&'a String, ()> {
 
     ctx.print_color_centered(5, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "Please Enter your name");
@@ -440,19 +474,20 @@ pub fn entering_name<'a>(ctx : &mut Rltk, name : &'a mut String) -> Result<&'a S
                         name.pop();
                     }
                 }
-                VirtualKeyCode::Space => return Ok(name),
+                VirtualKeyCode::Return => return Ok(name),
                 _ => ctx.print_color_centered(12, RGB::named(rltk::RED), RGB::named(rltk::BLACK), "Error!"),
             }
         }
         None => (),
     }
     ctx.print_color_centered(7, RGB::named(rltk::WHITESMOKE), RGB::named(rltk::BLACK), format!("Your current name: {}", name));
-    ctx.print_color_centered(9, RGB::named(rltk::ORANGE), RGB::named(rltk::BLACK), "Esc to save");
+    ctx.print_color_centered(9, RGB::named(rltk::ORANGE), RGB::named(rltk::BLACK), "Tap Enter to save");
 
     Err(())
 }
 
-// Need for testing
+
+/// Draw a box with the current real-time rating of the game
 pub fn show_rating(gs: &mut State, ctx: &mut Rltk) -> ItemMenuResult {
     let message = b"{\"__RATING__\":\"\"}".to_vec();
     gs.game_client.send_message(message);
@@ -462,9 +497,10 @@ pub fn show_rating(gs: &mut State, ctx: &mut Rltk) -> ItemMenuResult {
     let response = clone.into_iter().filter(|(key, _)| *key == "__RATING__").collect::<Vec<_>>();
 
     println!("name resp size: {}", response.len());
-    
+
     let mut r = Vec::<(String, i32)>::new();
 
+    // parsing response
     if !response.is_empty() {
         let value = &response[0].1;
         let split = value.split(' ');
@@ -484,15 +520,15 @@ pub fn show_rating(gs: &mut State, ctx: &mut Rltk) -> ItemMenuResult {
 
     let count = r.len();
 
-    let y = (25 - (count / 2)) as i32;
+    let mut y = (25 - (count / 2)) as i32;
     ctx.draw_box(15, y - 2, 31, (count + 3) as i32, RGB::named(rltk::WHITE), RGB::named(rltk::BLACK));
     ctx.print_color(18, y - 2, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "Rating");
     ctx.print_color(18, y + count as i32 + 1, RGB::named(rltk::YELLOW), RGB::named(rltk::BLACK), "ESCAPE to cancel");
 
-    let mut x = 20;
+    let x = 20;
     for record in r {
         ctx.print_color(x, y, RGB::named(rltk::AQUA), RGB::named(rltk::BLACK), format!("{}: {}", record.0, record.1));
-        x += 1;
+        y += 1;
     }
 
     match ctx.key {

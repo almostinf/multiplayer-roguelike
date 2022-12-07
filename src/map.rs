@@ -1,25 +1,24 @@
-use rltk::{ RGB, Rltk, RandomNumberGenerator };
+use rltk::{ RGB, Rltk, RandomNumberGenerator, Point};
 use specs::{World, Entity};
-use super::Rect;
+
 use std::cmp::{max, min};
-use rltk::{Point};
 use serde::{Serialize, Deserialize};
 
-const MAX_ROOMS : i32 = 30;
-const MIN_SIZE : i32 = 6;
-const MAX_SIZE : i32 = 10;
-pub const MAPWIDTH : usize = 80;
-pub const MAPHEIGHT : usize = 43;
-pub const MAPCOUNT : usize = MAPHEIGHT * MAPWIDTH;
+use super::Rect;
+use super::constants::*;
+
 
 #[derive(PartialEq, Copy, Clone, Serialize, Deserialize)]
+/// Stores all tile types of the game
 pub enum TileType {
     Wall, 
     Floor,
     DownStairs,
 }
 
+
 #[derive(Default, Serialize, Deserialize, Clone)]
+/// Represents the game map
 pub struct Map {
     pub tiles : Vec<TileType>,
     pub rooms : Vec<Rect>,
@@ -35,8 +34,10 @@ pub struct Map {
     pub tile_content : Vec<Vec<Entity>>,
 }
 
+
 impl Map {
 
+    /// Create new map, set tunnels and tiles
     pub fn new(new_depth : i32) -> Self {
         let mut map = Map {
             tiles : vec![TileType::Wall; MAPCOUNT],
@@ -59,11 +60,13 @@ impl Map {
             let y = rng.roll_dice(1, MAPHEIGHT as i32 - h - 1) - 1;
             let new_room = Rect::new(x, y, w, h);
             let mut ok = true;
+
             for other_room in map.rooms.iter() {
                 if new_room.intersect(other_room) {
                     ok = false;
                 }
             }
+
             if ok {
                 map.apply_room_to_map(&new_room);
     
@@ -83,12 +86,15 @@ impl Map {
                 map.rooms.push(new_room);
             }
         }
+
         let stairs_position = map.rooms[map.rooms.len() - 1].center();
         let stairs_index = xy_idx(stairs_position.0, stairs_position.1);
         map.tiles[stairs_index] = TileType::DownStairs;
+
         map
     }
 
+    /// Apply given room to map
     fn apply_room_to_map(&mut self, room : &Rect) {
         for y in room.y1 + 1 ..= room.y2 {
             for x in room.x1 + 1 ..= room.x2 {
@@ -98,6 +104,7 @@ impl Map {
         }
     }
     
+    /// Apply given horizontal tunnel to map
     fn apply_horizontal_tunnel(&mut self, x1 : i32, x2 : i32, y : i32) {
         for x in min(x1, x2) ..= max(x1, x2) {
             let idx = xy_idx(x, y);
@@ -107,6 +114,7 @@ impl Map {
         }
     }
     
+    /// Apply given vertical tunnel to map
     fn apply_vertical_tunnel(&mut self, y1 : i32, y2 : i32, x : i32) {
         for y in min(y1, y2) ..= max(y1, y2) {
             let idx = xy_idx(x, y);
@@ -116,6 +124,7 @@ impl Map {
         }
     }
 
+    /// Check if the exit is not blocked
     fn is_exit_valid(&self, x : i32, y : i32) -> bool {
         if x < 1 || x > self.width - 1 || y < 1 || y > self.height - 1 {
             return false;
@@ -124,12 +133,14 @@ impl Map {
         !self.blocked[idx]
     }
 
+    /// Fill all wall tiles as blocked
     pub fn populate_blocked(&mut self) {
         for (i, tile) in self.tiles.iter_mut().enumerate() {
             self.blocked[i] = *tile == TileType::Wall;
         }
     }
 
+    /// Clear all content tile index
     pub fn clear_content_index(&mut self) {
         for content in self.tile_content.iter_mut() {
             content.clear();
@@ -138,25 +149,34 @@ impl Map {
 
 }
 
+
+/// Count idx from x, y
 pub fn xy_idx(x : i32, y : i32) -> usize {
     (y as usize * MAPWIDTH) + x as usize
 }
 
+/// Count x, y from idx
 pub fn idx_xy(idx : i32) -> (i32, i32) {
     (idx % MAPWIDTH as i32, idx / MAPWIDTH as i32)
 }
 
+
+// Count dimensions
 impl rltk::Algorithm2D for Map {
     fn dimensions(&self) -> rltk::Point {
         rltk::Point::new(self.width, self.height)
     }
 }
 
+
 impl rltk::BaseMap for Map {
+
+    /// Check is tile a wall
     fn is_opaque(&self, idx : usize) -> bool {
         self.tiles[idx as usize] == TileType::Wall
     }
 
+    /// Count path distance from two indexes
     fn get_pathing_distance(&self, idx1: usize, idx2: usize) -> f32 {
         let w = self.width as usize;
         let p1 = Point::new(idx1 % w, idx1 / w);
@@ -164,13 +184,14 @@ impl rltk::BaseMap for Map {
         rltk::DistanceAlg::Pythagoras.distance2d(p1, p2)
     }
 
+    /// Return all available exits
     fn get_available_exits(&self, idx : usize) -> rltk::SmallVec<[(usize, f32); 10]> {
         let mut exits = rltk::SmallVec::new();
         let x = idx as i32 % self.width;
         let y = idx as i32 / self.width;
         let w = self.width as usize;
 
-        // Cardinal directions
+        // cardinal directions
         if self.is_exit_valid(x - 1, y) {
             exits.push((idx - 1, 1.0))
         };
@@ -184,7 +205,7 @@ impl rltk::BaseMap for Map {
             exits.push((idx + w, 1.0))
         };
 
-        // Diagonals 
+        // diagonals 
         if self.is_exit_valid(x - 1, y - 1) {
             exits.push(((idx - w) - 1, 1.45));
         }
@@ -201,6 +222,8 @@ impl rltk::BaseMap for Map {
     }
 }
 
+
+/// Setting glyph and colour to the floor, wall, downstairs tiles
 pub fn draw_map(ecs: &World, ctx: &mut Rltk) {
     let map = ecs.fetch::<Map>();
 
@@ -208,7 +231,7 @@ pub fn draw_map(ecs: &World, ctx: &mut Rltk) {
     let mut x = 0;
 
     for (idx, tile) in map.tiles.iter().enumerate() {
-        // Render a title depending upon the tile type
+        // render a title depending upon the tile type
         if map.revealed_tiles[idx] {
             let glyph;
             let mut fg;

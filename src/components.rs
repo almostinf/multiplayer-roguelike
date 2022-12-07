@@ -1,3 +1,5 @@
+// This file stores all the components of the game
+
 use specs::prelude::*;
 use specs_derive::*;
 use rltk::RGB;

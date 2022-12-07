@@ -1,12 +1,13 @@
 use rltk::{VirtualKeyCode, Rltk, Point};
 use specs::prelude::*;
-use crate::{RunState, CombatStats, WantsToMelee, GameLog, Monster};
 
-use super::{Position, Player, TileType, State, Viewshed, Map, Item, WantsToPickupItem, ClientHandler};
-use super::{xy_idx};
 use std::cmp::{min, max};
 
+use super::{Position, Player, TileType, State, Viewshed, Map, Item, WantsToPickupItem, ClientHandler};
+use super::{xy_idx, RunState, CombatStats, WantsToMelee, GameLog, Monster};
 
+
+/// Move player if the new position is not blocked
 pub fn try_move_player(current_depth : i32, name : &String, game_client : &mut ClientHandler, delta_x : i32, delta_y : i32, ecs : &mut World) {
     let mut positions = ecs.write_storage::<Position>();
     let mut players = ecs.write_storage::<Player>();
@@ -41,11 +42,18 @@ pub fn try_move_player(current_depth : i32, name : &String, game_client : &mut C
             ppos.x = pos.x;
             ppos.y = pos.y;
 
+            let destination_idx = xy_idx(ppos.x, ppos.y);
+
+            let message = format!("{{\"__MESSAGE__\":\"{} {} {}\"}}", name, destination_idx, current_depth).as_bytes().to_vec();
+            game_client.send_message(message);
+
             viewshed.dirty = true;
         }
     }
 }
 
+
+/// Pick up item
 fn get_item(ecs: &mut World) {
     let player_pos = ecs.fetch::<Point>();
     let player_entity = ecs.fetch::<Entity>();
@@ -71,6 +79,8 @@ fn get_item(ecs: &mut World) {
 
 }
 
+
+/// Go to next level if the tile is downstairs
 pub fn try_next_level(ecs : &mut World) -> bool {
     let player_pos = ecs.fetch::<Point>();
     let map = ecs.fetch::<Map>();
@@ -84,8 +94,11 @@ pub fn try_next_level(ecs : &mut World) -> bool {
     }
 }
 
-pub fn player_input(gs : &mut State, ctx : &mut Rltk) -> RunState {
 
+/// Handles player input
+pub fn player_input(gs : &mut State, ctx : &mut Rltk) -> RunState {
+    
+    // get current depth
     let current_depth;
     {
         let worldmap = gs.ecs.read_resource::<Map>();
@@ -106,7 +119,7 @@ pub fn player_input(gs : &mut State, ctx : &mut Rltk) -> RunState {
             VirtualKeyCode::Down |
             VirtualKeyCode::S => try_move_player(current_depth, &gs.player_name, &mut gs.game_client, 0, 1, &mut gs.ecs),
 
-            // Diagonals
+            // diagonals
             VirtualKeyCode::Numpad9 | 
             VirtualKeyCode::E => try_move_player(current_depth, &gs.player_name, &mut gs.game_client, 1, -1, &mut gs.ecs),
             VirtualKeyCode::Numpad7 |
@@ -116,18 +129,18 @@ pub fn player_input(gs : &mut State, ctx : &mut Rltk) -> RunState {
             VirtualKeyCode::Numpad1 |
             VirtualKeyCode::Z => try_move_player(current_depth, &gs.player_name, &mut gs.game_client, -1, 1, &mut gs.ecs),
             
-            // Picking up items
+            // picking up items
             VirtualKeyCode::G => get_item(&mut gs.ecs),
             VirtualKeyCode::I => return RunState::ShowInventory,
             VirtualKeyCode::F => return RunState::ShowDropItem,
 
-            //Remove Item
+            // remove Item
             VirtualKeyCode::R => return RunState::ShowRemoveItem,
 
-            // Save and Quit
-            VirtualKeyCode::Escape => return RunState::SaveGame,
+            // save and quit
+            VirtualKeyCode::Escape => return RunState::MainMenu { menu_selection: super::MainMenuSelection::Quit },
 
-            //level change
+            // level change
             VirtualKeyCode::Period => {
                 if try_next_level(&mut gs.ecs) {
                     return RunState::NextLevel
@@ -146,6 +159,8 @@ pub fn player_input(gs : &mut State, ctx : &mut Rltk) -> RunState {
     RunState::PlayerTurn
 }
 
+
+/// Skip turns for healing if no mobs around
 fn skip_turn(ecs : &mut World) -> RunState {
     let player_entity = ecs.fetch::<Entity>();
     let viewshed_components = ecs.read_storage::<Viewshed>();
@@ -165,10 +180,12 @@ fn skip_turn(ecs : &mut World) -> RunState {
             }
         }
     }
+
     if can_heal {
         let mut health_components = ecs.write_storage::<CombatStats>();
         let player_hp = health_components.get_mut(*player_entity).unwrap();
         player_hp.hp = i32::min(player_hp.hp + 1, player_hp.max_hp);
     }
+    
     RunState::PlayerTurn
 }

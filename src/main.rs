@@ -1,6 +1,8 @@
 use rltk::{Rltk, GameState, Point, RGB};
 use specs::prelude::*;
 
+use url::Url;
+
 mod map;
 pub use map::*;
 mod rect;
@@ -9,38 +11,35 @@ mod player;
 use player::*;
 mod components;
 pub use components::*;
-mod visibility_system;
-use url::Url;
-pub use visibility_system::*;
-mod monster_ai_system;
-pub use monster_ai_system::*;
-mod map_indexing_system;
-pub use map_indexing_system::*;
-mod melee_combat_system;
-pub use melee_combat_system::*;
-mod damage_system;
-pub use damage_system::*;
+
 mod gui;
 pub use gui::*;
 mod gamelog;
 pub use gamelog::*;
 mod spawner;
 pub use spawner::*;
-mod inventory_system;
-pub use inventory_system::*;
 extern crate serde;
 use specs::saveload::{SimpleMarker, SimpleMarkerAllocator};
-pub mod saveload_system;
 mod random_table;
 pub use random_table::*;
 mod client;
 pub use client::*;
-mod enemies;
-pub use enemies::*;
+mod constants;
+pub use constants::*;
 
-use crate::saveload_system::{save_map, set_map};
+pub mod systems;
+pub use systems::damage_system::*;
+pub use systems::enemy_system::*;
+pub use systems::inventory_system::*;
+pub use systems::map_indexing_system::*;
+pub use systems::saveload_system::*;
+pub use systems::visibility_system::*;
+pub use systems::melee_combat_system::*;
+pub use systems::monster_ai_system::*;
+
 
 #[derive(PartialEq, Copy, Clone)]
+/// The states of a finite automaton in which the player can be
 pub enum RunState {
     EnteringName,
     AwaitingInput,
@@ -57,12 +56,13 @@ pub enum RunState {
     MainMenu {
         menu_selection : gui::MainMenuSelection,
     },
-    SaveGame,
     NextLevel,
     ShowRemoveItem,
     GameOver,
 }
 
+
+/// Handler for ecs and clients
 pub struct State {
     pub ecs : World,
     pub game_client : ClientHandler,
@@ -70,13 +70,17 @@ pub struct State {
     pub enemies : Vec<String>,
 }
 
+
 impl GameState for State {
+
+    /// Рandling the states of a end state machine every tick
     fn tick(&mut self, ctx : &mut Rltk) {
         ctx.cls();
 
         self.game_client.get_messages();
 
         self.delete_enemies();
+        self.update_health_enemies();
 
         let mut newrunstate;
         {
@@ -84,6 +88,7 @@ impl GameState for State {
             newrunstate = *runstate;
         }
 
+        // draw map if current state is not in main menu
         match newrunstate {
             RunState::MainMenu {..} => {}
             _ => {
@@ -107,6 +112,7 @@ impl GameState for State {
             }
         }
 
+        // handling end state machine
         match newrunstate {
             RunState::EnteringName => {
                 self.run_systems();
@@ -117,14 +123,30 @@ impl GameState for State {
                         let message = format!("{{\"__IS_NAME__\":\"{}\"}}", self.player_name).as_bytes().to_vec();
                         self.game_client.send_message(message);
 
-                        let clone = self.game_client.messages.clone();
-                        let response = clone.into_iter().filter(|(key, _)| *key == "__IS_NAME__").collect::<Vec<_>>();
+                        let mut clone = self.game_client.messages.clone();
+                        let mut response = clone.into_iter().filter(|(key, _)| *key == "__IS_NAME__").collect::<Vec<_>>();
+
+                        while response.is_empty() {
+                            self.game_client.get_messages();
+                            clone = self.game_client.messages.clone();
+                            response = clone.into_iter().filter(|(key, _)| *key == "__IS_NAME__").collect::<Vec<_>>();
+                        }
 
                         if !response.is_empty() {
                             if response[0].1 == "T" {
                                 println!("in true result\n");
                                 let message = format!("{{\"__TRACK_ME__\":\"{} {}\"}}", self.player_name, 1).as_bytes().to_vec();
                                 self.game_client.send_message(message);
+
+                                let player = self.ecs.fetch::<Entity>();
+                                let mut names = self.ecs.write_storage::<Name>();
+
+                                let name = names.get_mut(*player);
+                                
+                                if let Some(_name) = name {
+                                    _name.name = self.player_name.clone();
+                                }
+
                                 newrunstate = RunState::PreRun;
                             } else if response[0].1 == "F" {
                                 ctx.print_color_centered(15, RGB::named(rltk::RED), RGB::named(rltk::BLACK), "This name is used. Please enter another");
@@ -214,14 +236,14 @@ impl GameState for State {
                         match selected {
                             gui::MainMenuSelection::Play => newrunstate = RunState::PreRun,
                             gui::MainMenuSelection::SaveGame => {
-                                saveload_system::save_game(&mut self.ecs);
+                                systems::saveload_system::save_game(&mut self.ecs);
                                 newrunstate = RunState::MainMenu{ menu_selection : gui::MainMenuSelection::Quit };
                             }
                             gui::MainMenuSelection::LoadGame => {
-                                if saveload_system::does_save_exist() {
-                                    saveload_system::load_game(&mut self.ecs);
+                                if systems::saveload_system::does_save_exist() {
+                                    systems::saveload_system::load_game(&mut self.ecs);
                                     newrunstate = RunState::AwaitingInput;
-                                    saveload_system::delete_save();
+                                    systems::saveload_system::delete_save();
                                 } else {
                                     ctx.print_color_centered(30, RGB::named(rltk::RED), RGB::named(rltk::BLACK), "You don't have saves!!!");
                                 }
@@ -231,10 +253,6 @@ impl GameState for State {
                         }
                     }
                 }
-            }
-            RunState::SaveGame => {
-                saveload_system::save_game(&mut self.ecs);
-                newrunstate = RunState::MainMenu { menu_selection: gui::MainMenuSelection::Quit };
             }
             RunState::NextLevel => {
                 self.goto_next_level();
@@ -270,9 +288,9 @@ impl GameState for State {
             *runwriter = newrunstate;
         }
 
-        damage_system::delete_the_dead(&mut self.ecs);
+        systems::damage_system::delete_the_dead(&mut self.ecs);
 
-        if self.game_client.messages.len() > 1 && newrunstate != RunState::EnteringName {
+        if self.game_client.messages.len() > 1 {
             self.game_client.messages.clear();
         }
     }
@@ -280,11 +298,11 @@ impl GameState for State {
 
 
 impl State {
+    /// void all game systems
     fn run_systems(&mut self) {
         let mut vis = VisibilitySystem{};
         vis.run_now(&self.ecs);
 
-        // TESTING
         let enemies_pos = self.get_enemies_pos();
         let mut en = EnemySystem{enemies_pos};
         en.run_now(&self.ecs);
@@ -295,8 +313,10 @@ impl State {
         mapindex.run_now(&self.ecs);
         let mut melee = MeleeCombatSystem{};
         melee.run_now(&self.ecs);
-        let mut damage = DamageSystem{};
+
+        let mut damage = DamageSystem{ enemies : self.enemies.clone(), game_client : &mut self.game_client };
         damage.run_now(&self.ecs);
+
         let mut pickup = ItemCollectSystem{};
         pickup.run_now(&self.ecs);
         let mut potions = ItemUseSystem{};
@@ -310,8 +330,9 @@ impl State {
 
     }
 
+    /// Handles enemy movements, spawns it if it was not in the enemy vector
     fn get_enemies_pos(&mut self) -> Vec<(String, i32)> {
-
+        // get current depth
         let current_depth;
         {
             let worldmap = self.ecs.read_resource::<Map>();
@@ -322,7 +343,8 @@ impl State {
 
         let clone = self.game_client.messages.clone();
         let response = clone.into_iter().filter(|(key, _)| *key == "__MESSAGE__").collect::<Vec<_>>();
-
+        
+        // parsing response
         for (_, value) in response {
             let split = value.split(' ');
             let v = split.collect::<Vec<&str>>();
@@ -352,6 +374,7 @@ impl State {
         enemies_pos
     }
 
+    /// Removes all enemies when they change level
     fn delete_enemies(&mut self) {
         let clone = self.game_client.messages.clone();
         let response = clone.into_iter().filter(|(key, _)| *key == "__CHANGE__").collect::<Vec<_>>();
@@ -362,7 +385,7 @@ impl State {
             let split = value.split(' ');
             let v = split.collect::<Vec<&str>>();
             if v.len() > 1 {
-                println!("to delete: {} {}", v[0].to_string(), value);
+                // println!("to delete: {} {}", v[0].to_string(), value);
                 let level = v[1].parse::<i32>().unwrap();
                 to_remove.push((v[0].to_string(), level));
             }
@@ -388,11 +411,6 @@ impl State {
                     to_delete.push(e);
                     let index = self.enemies.iter().position(|x| *x == *name.name).expect("Can't find position");
                     self.enemies.remove(index);
-
-                    for e in self.enemies.iter() {
-                        print!("{} ", e);
-                    }
-                    println!();
                 }
             }
         }
@@ -402,6 +420,40 @@ impl State {
         }
     }
 
+    /// Update enemies and player health
+    fn update_health_enemies(&mut self) {
+        let clone = self.game_client.messages.clone();
+        let response = clone.into_iter().filter(|(key, _)| *key == "__DAMAGE__").collect::<Vec<_>>();
+
+        let mut to_update = Vec::<(String, i32)>::new();
+
+        for (_, value) in response {
+            let split = value.split(' ');
+            let v = split.collect::<Vec<&str>>();
+            if v.len() > 1 {
+                let health = v[1].parse::<i32>().unwrap();
+                println!("to update: {} {}", v[0].to_string(), health);
+                to_update.push((v[0].to_string(), health));
+            }
+        }
+        
+        if !to_update.is_empty() {
+            let entities = self.ecs.entities();
+            let names = self.ecs.read_storage::<Name>();
+            let mut combat_stats = self.ecs.write_storage::<CombatStats>();
+
+            for e in entities.join() {
+                let name = names.get(e).expect("Can't get name of entity");
+
+                if let Some(enemy) = to_update.iter().find(|(_name, _)| *_name == name.name) {
+                    let old_health = combat_stats.get_mut(e).expect("Can't get combat stats");
+                    old_health.hp = enemy.1;
+                }
+            }
+        }
+    }
+
+    // Return all entities that should be remove on level change
     fn entities_to_remove_on_level_change(&mut self) -> Vec<Entity> {
         let entities = self.ecs.entities();
         let player = self.ecs.read_storage::<Player>();
@@ -413,13 +465,13 @@ impl State {
         for entity in entities.join() {
             let mut should_delete = true;
 
-            // Don't delete the player
+            // don't delete the player
             let p = player.get(entity);
             if let Some(_p) = p {
                 should_delete = false;
             }
 
-            // Don't delete the player's equipment
+            // don't delete the player's equipment
             let bp = backpack.get(entity);
             if let Some(bp) = bp {
                 if bp.owner == *player_entity {
@@ -445,13 +497,16 @@ impl State {
         to_delete
     }
 
+    /// Moves to another level and handles responses from the server
     fn goto_next_level(&mut self) {
-        // Delete entities that are not the player or his/her equipment
+
+        // delete entities that are not the player or his/her equipment
         let to_delete = self.entities_to_remove_on_level_change();
         for target in to_delete {
             self.ecs.delete_entity(target).expect("Unable to delete entity");
         }
         
+        // get current depth
         let current_depth;
         {
             let worldmap = self.ecs.read_resource::<Map>();
@@ -475,7 +530,7 @@ impl State {
         if !response.is_empty() {
             if response[0].1 == "F" {
                 {
-                    // Build a new map and place the player
+                    // build a new map and place the player
                     let worldmap;
                     let current_depth;  
                     {
@@ -485,12 +540,12 @@ impl State {
                         worldmap = worldmap_resource.clone();
                     }
 
-                    // Spawn rooms
+                    // spawn rooms
                     for room in worldmap.rooms.iter().skip(1) {
                         spawner::spawn_room(&mut self.ecs, room, current_depth + 1);
                     }
 
-                    // Place the player and update resources
+                    // place the player and update resources
                     let (player_x, player_y) = worldmap.rooms[0].center();
                     let mut player_position = self.ecs.write_resource::<Point>();
                     *player_position = Point::new(player_x, player_y);
@@ -502,14 +557,14 @@ impl State {
                         player_pos_comp.y = player_y;
                     }
 
-                    // Mark the player's visibility as dirty
+                    // mark the player's visibility as dirty
                     let mut viewshed_components = self.ecs.write_storage::<Viewshed>();
                     let vs = viewshed_components.get_mut(*player_entity);
                     if let Some(vs) = vs {
                         vs.dirty = true;
                     }
 
-                    // Notify the player and give them some health
+                    // notify the player and give them some health
                     let mut gamelog = self.ecs.fetch_mut::<gamelog::GameLog>();
                     gamelog.entries.push("You descend to the next level, and take a moment to heal.".to_string());
                     let mut player_health_store = self.ecs.write_storage::<CombatStats>();
@@ -525,11 +580,11 @@ impl State {
                 
             } else {
                 println!("I am setting map: {}", response[0].1.len());
-                set_map(&mut self.ecs, response[0].1.clone());
+                load_map(&mut self.ecs, response[0].1.clone());
 
                 let player_entity = self.ecs.fetch::<Entity>();
 
-                // Notify the player and give them some health
+                // notify the player and give them some health
                 let mut gamelog = self.ecs.fetch_mut::<gamelog::GameLog>();
                 gamelog.entries.push("You descend to the next level, and take a moment to heal.".to_string());
                 let mut player_health_store = self.ecs.write_storage::<CombatStats>();
@@ -547,6 +602,7 @@ impl State {
         }
     }
 
+    /// delete everything after game over
     fn game_over_cleanup(&mut self) {
         // Delete everything
         let mut to_delete = Vec::new();
@@ -557,66 +613,22 @@ impl State {
         for del in to_delete.iter() {
             self.ecs.delete_entity(*del).expect("Deletion failed");
         }
-
-        // let message = format!("{{\"__IS_MAP__\":\"{}\"}}", 1).as_bytes().to_vec();
-        // self.game_client.send_message(message);
-
-        // let response = self.game_client.get_messages("__IS_MAP__".to_string());
-
-        // if !response.is_empty() {
-        //     println!("I am setting map: {}", response[0].1.len());
-        //     set_map(&mut self.ecs, response[0].1.clone());
-
-        //     let message = format!("{{\"__TRACK_ME__\":\"{} {}\"}}", self.player_name, 1).as_bytes().to_vec();
-        //     self.game_client.send_message(message);
-        // }
-
-        // // Build a new map and place the player
-        // let worldmap;
-        // {
-        //     let mut worldmap_resource = self.ecs.write_resource::<Map>();
-        //     *worldmap_resource = Map::new(1);
-        //     worldmap = worldmap_resource.clone();
-        // }
-
-        // // Spawn bad guys
-        // for room in worldmap.rooms.iter().skip(1) {
-        //     spawner::spawn_room(&mut self.ecs, room, 1);
-        // }
-
-        // // Place the player and update resources
-        // let (player_x, player_y) = worldmap.rooms[0].center();
-        // let player_entity = spawner::player(&mut self.ecs, player_x, player_y);
-        // let mut player_position = self.ecs.write_resource::<Point>();
-        // *player_position = Point::new(player_x, player_y);
-        // let mut position_components = self.ecs.write_storage::<Position>();
-        // let mut player_entity_writer = self.ecs.write_resource::<Entity>();
-        // *player_entity_writer = player_entity;
-        // let player_pos_comp = position_components.get_mut(player_entity);
-        // if let Some(player_pos_comp) = player_pos_comp {
-        //     player_pos_comp.x = player_x;
-        //     player_pos_comp.y = player_y;
-        // }
-
-        // // Mark the player's visibility as dirty
-        // let mut viewshed_components = self.ecs.write_storage::<Viewshed>();
-        // let vs = viewshed_components.get_mut(player_entity);
-        // if let Some(vs) = vs {
-        //     vs.dirty = true;
-        // }
     }
 }
 
+
 fn main() -> rltk::BError {
+
     use rltk::RltkBuilder;
     let mut context = RltkBuilder::simple80x50()
-        .with_title("Roguelike Testing")
+        .with_title("Multiplayer Roguelike")
         .build()?;
     context.with_post_scanlines(true);
 
     let map = Map::new(1);
     let (player_x, player_y) = map.rooms[0].center();
 
+    // initialize game state
     let mut gs = State{ 
         ecs : World::new(),
         game_client : ClientHandler::new(Url::parse("ws://127.0.0.1:6881").expect("Address error")),
@@ -624,6 +636,7 @@ fn main() -> rltk::BError {
         enemies : Vec::<String>::new(),
     };
 
+    // register all components
     gs.ecs.register::<Position>();
     gs.ecs.register::<Renderable>();
     gs.ecs.register::<Player>();
@@ -654,9 +667,9 @@ fn main() -> rltk::BError {
     gs.ecs.register::<WantsToRemoveItem>();
     gs.ecs.register::<Enemy>();
     
-
     gs.ecs.insert(SimpleMarkerAllocator::<SerializeMe>::new());
 
+    // insert player entity to the game state
     let player_entity = spawner::player(&mut gs.ecs, player_x, player_y);
     gs.ecs.insert(rltk::RandomNumberGenerator::new());
 
@@ -685,6 +698,7 @@ fn main() -> rltk::BError {
         response = clone.into_iter().filter(|(key, _)| *key == "__IS_MAP__").collect::<Vec<_>>();
     }
 
+    // setting map if server has it or send it
     if !response.is_empty() {
         if response[0].1 == "F" {
             let new_map = save_map(&mut gs.ecs);
@@ -693,7 +707,7 @@ fn main() -> rltk::BError {
             println!("send map");
         } else {
             println!("I am setting map: {}", response[0].1.len());
-            set_map(&mut gs.ecs, response[0].1.clone());
+            load_map(&mut gs.ecs, response[0].1.clone());
         }
     }
 

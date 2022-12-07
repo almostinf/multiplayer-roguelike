@@ -2,15 +2,13 @@ use std::collections::HashMap;
 
 use rltk::{RGB, RandomNumberGenerator};
 use specs::prelude::*;
-use crate::{AreaOfEffect, EquipmentSlot, Equippable, MeleePowerBonus, DefenseBonus};
-use super::random_table::*;
-
-use super::{CombatStats, Player, Renderable, Name, Position, Viewshed, Monster, BlocksTile, Rect, Item, ProvidesHealing, Consumable, Ranged, InflictDamage, Confusion, SerializeMe, Enemy};
-use super::MAPWIDTH;
 use specs::saveload::{MarkedBuilder, SimpleMarker};
 
-const MAX_MONSTERS : i32 = 4;
-// const MAX_ITEMS: i32 = 2;
+use super::{CombatStats, Player, Renderable, Name, Position, Viewshed, Monster, BlocksTile, Rect, Item, ProvidesHealing, Consumable, Ranged, InflictDamage, Confusion, SerializeMe, Enemy};
+use super::constants::*;
+use super::{AreaOfEffect, EquipmentSlot, Equippable, MeleePowerBonus, DefenseBonus};
+use super::random_table::*;
+
 
 /// Spawns the player and returns his entity object
 pub fn player(ecs: &mut World, player_x: i32, player_y: i32) -> Entity {
@@ -29,6 +27,7 @@ pub fn player(ecs: &mut World, player_x: i32, player_y: i32) -> Entity {
         .marked::<SimpleMarker<SerializeMe>>()
         .build()
 }
+
 
 /// Spawns the enemy
 pub fn enemy(ecs: &mut World, enemy_x: i32, enemy_y: i32, enemy_name: String) -> Entity {
@@ -60,14 +59,20 @@ pub fn random_monster(ecs: &mut World, x: i32, y: i32) {
     }
 }
 
+
+/// Return orc monster
 fn orc(ecs: &mut World, x: i32, y: i32) {
     monster(ecs, x, y, rltk::to_cp437('o'), "Orc");
 }
 
+
+/// Return goblin monster
 fn goblin(ecs: &mut World, x: i32, y: i32) {
     monster(ecs, x, y, rltk::to_cp437('g'), "Goblin");
 }
 
+
+/// Return a monster with given position and glyph
 fn monster<S : ToString>(ecs: &mut World, x: i32, y: i32, glyph: rltk::FontCharType, name: S) {
     ecs.create_entity()
         .with(Position {x, y})
@@ -86,12 +91,14 @@ fn monster<S : ToString>(ecs: &mut World, x: i32, y: i32, glyph: rltk::FontCharT
         .build();
 }
 
+
 #[allow(clippy::map_entry)]
+/// Spawn rooms with monsters and items from random table
 pub fn spawn_room(ecs: &mut World, room: &Rect, map_depth : i32) {
     let spawn_table = room_table(map_depth);
     let mut spawn_points : HashMap<usize, String> = HashMap::new();
 
-    // Scope to keep the borrow happy
+    // scope to keep the borrow happy
     {
         let mut rng = ecs.write_resource::<RandomNumberGenerator>();
         let num_spawns = rng.roll_dice(1, MAX_MONSTERS + 3) + (map_depth - 1) - 3;
@@ -112,7 +119,8 @@ pub fn spawn_room(ecs: &mut World, room: &Rect, map_depth : i32) {
             }
         }
     }
-    // Actually spawn the monsters
+
+    // actually spawn the monsters and items
     for spawn in spawn_points.iter() {
         let x = (*spawn.0 % MAPWIDTH) as i32;
         let y = (*spawn.0 / MAPWIDTH) as i32;
@@ -133,6 +141,8 @@ pub fn spawn_room(ecs: &mut World, room: &Rect, map_depth : i32) {
     }
 }
 
+
+/// Return a health potion entity with given position
 fn health_potion(ecs: &mut World, x : i32, y: i32) {
     ecs.create_entity()
         .with(Position{x, y})
@@ -150,6 +160,8 @@ fn health_potion(ecs: &mut World, x : i32, y: i32) {
         .build();
 }
 
+
+/// Return a magic missible scroll with given position
 fn magic_missible_scroll(ecs : &mut World, x : i32, y : i32) {
     ecs.create_entity()
         .with(Position {x, y})
@@ -168,20 +180,21 @@ fn magic_missible_scroll(ecs : &mut World, x : i32, y : i32) {
         .build();
 }
 
-fn random_item(ecs : &mut World, x : i32, y : i32) {
-    let roll : i32;
-    {
-        let mut rng = ecs.write_resource::<RandomNumberGenerator>();
-        roll = rng.roll_dice(1, 4);
-    }
-    match roll {
-        1 => health_potion(ecs, x, y),
-        2 => fireball_scroll(ecs, x, y),
-        3 => confusion_scroll(ecs, x, y),
-        _ => magic_missible_scroll(ecs, x, y)
-    }
-}
+// fn random_item(ecs : &mut World, x : i32, y : i32) {
+//     let roll : i32;
+//     {
+//         let mut rng = ecs.write_resource::<RandomNumberGenerator>();
+//         roll = rng.roll_dice(1, 4);
+//     }
+//     match roll {
+//         1 => health_potion(ecs, x, y),
+//         2 => fireball_scroll(ecs, x, y),
+//         3 => confusion_scroll(ecs, x, y),
+//         _ => magic_missible_scroll(ecs, x, y)
+//     }
+// }
 
+/// Return a fireball scroll with given position
 fn fireball_scroll(ecs : &mut World, x : i32, y : i32) {
     ecs.create_entity()
         .with(Position {x, y})
@@ -201,6 +214,8 @@ fn fireball_scroll(ecs : &mut World, x : i32, y : i32) {
         .build();
 }
 
+
+/// Return a confusion scroll with given position
 fn confusion_scroll(ecs : &mut World, x : i32, y : i32) {
     ecs.create_entity()
         .with(Position {x, y})
@@ -219,6 +234,8 @@ fn confusion_scroll(ecs : &mut World, x : i32, y : i32) {
         .build();
 }
 
+
+/// Return a dagger with given position
 fn dagger(ecs : &mut World, x : i32, y : i32) {
     ecs.create_entity()
         .with(Position {x, y})
@@ -236,6 +253,8 @@ fn dagger(ecs : &mut World, x : i32, y : i32) {
         .build();
 }
 
+
+/// Return a shield with given position
 fn shield(ecs : &mut World, x : i32, y : i32) {
     ecs.create_entity()
         .with(Position {x, y})
@@ -253,6 +272,8 @@ fn shield(ecs : &mut World, x : i32, y : i32) {
         .build();
 }
 
+
+/// Return a longsword with given position
 fn longsword(ecs : &mut World, x : i32, y : i32) {
     ecs.create_entity()
         .with(Position {x, y})
@@ -270,6 +291,8 @@ fn longsword(ecs : &mut World, x : i32, y : i32) {
         .build();
 }
 
+
+/// Return a tower shield with given position
 fn tower_shield(ecs : &mut World, x : i32, y : i32) {
     ecs.create_entity()
         .with(Position {x, y})

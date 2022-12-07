@@ -1,10 +1,12 @@
 use rltk::RandomNumberGenerator;
 
 
+/// Represents counts and names of items or monsters
 pub struct RandomEntry {
     name : String,
     weight : i32,
 }
+
 
 impl RandomEntry {
     pub fn new<S:ToString>(name : S, weight : i32) -> RandomEntry {
@@ -15,13 +17,18 @@ impl RandomEntry {
     }
 }
 
+
 #[derive(Default)]
+/// Store entities and their total weight
 pub struct RandomTable {
     entries : Vec<RandomEntry>,
     total_weight : i32,
 }
 
+
 impl RandomTable {
+
+    /// Create new random table
     pub fn new() -> RandomTable {
         RandomTable {
             entries : Vec::new(),
@@ -29,6 +36,7 @@ impl RandomTable {
         }
     }
 
+    /// Add new entity to random table
     pub fn add<S:ToString>(mut self, name : S, weight : i32) -> RandomTable {
         if weight > 0 {
             self.total_weight += weight;
@@ -37,10 +45,12 @@ impl RandomTable {
         self
     }
 
+    /// Randomly determines the number of different entries on the map
     pub fn roll(&self, rng : &mut RandomNumberGenerator) -> String {
         if self.total_weight == 0 {
             return "None".to_string();
         }
+
         let mut roll = rng.roll_dice(1, self.total_weight) - 1;
         let mut index : usize = 0;
 
@@ -51,10 +61,13 @@ impl RandomTable {
             roll -= self.entries[index].weight;
             index += 1;
         }
+
         "None".to_string()
     }
 }
 
+
+/// Create a random table and add to it new entries
 pub fn room_table(map_depth : i32) -> RandomTable {
     RandomTable::new()
         .add("Goblin", 10)

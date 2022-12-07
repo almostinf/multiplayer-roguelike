@@ -4,6 +4,7 @@ use url::Url;
 use websocket::{ClientBuilder, Message, sync::Client};
 
 
+/// Used to send / receive data from the server
 pub struct ClientHandler {
     socket : Client<TcpStream>,
     pub messages : Vec<(String, String)>,
@@ -12,6 +13,7 @@ pub struct ClientHandler {
 
 impl ClientHandler {
 
+    /// Create new ClientHandler and set timeout for reading messages in stream
     pub fn new(request : Url) -> Self {
         let client = ClientBuilder::new(request.as_str())
 		.unwrap()
@@ -28,6 +30,7 @@ impl ClientHandler {
         }
     }
 
+    /// Сollects all messages from the stream
     pub fn get_messages(&mut self) {
 
         for msg in self.socket.incoming_messages() {
@@ -35,6 +38,8 @@ impl ClientHandler {
                 Ok(m) => {
                     match m {
                         websocket::OwnedMessage::Text(data) => {
+
+                            // deserialize json
                             let mut key = String::new();
                             let mut turn = false;
                             let mut skip = false;
@@ -77,11 +82,9 @@ impl ClientHandler {
                 Err(_) => break,
             }
         }
-
-        // let filtered_messages = all_messages.into_iter().filter(|(key, _)| *key == need_key).collect::<Vec<_>>();
-
     }
 
+    /// Send messages to the server
     pub fn send_message(&mut self, msg : Vec<u8>) {
         self.socket.send_message(&Message::binary(msg)).expect("Can't send message");
     }

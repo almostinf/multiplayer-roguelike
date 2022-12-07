@@ -14,6 +14,7 @@
 #define RATING "__RATING__"
 #define TRACK_ME "__TRACK_ME__"
 #define CHANGE "__CHANGE__"
+#define DAMAGE "__DAMAGE__"
 
 
 Json::Value WebsocketServer::parseJson(const string& json)
@@ -227,7 +228,7 @@ void WebsocketServer::onMessage(ClientConnection conn, WebsocketEndpoint::messag
 
 			if (rating.find(name) == rating.end()) {
 				rating.insert(std::make_pair(name, num));
-			} 
+			}
 			else {
 				rating[name] = num;
 			}
@@ -236,6 +237,12 @@ void WebsocketServer::onMessage(ClientConnection conn, WebsocketEndpoint::messag
 			std::string messageType = messageObject[CHANGE].asString();
 			messageObject.removeMember(CHANGE);
 			std::string key = CHANGE;
+			this->broadcastMessage(messageType, key);
+		}
+		else if (messageObject.isMember(DAMAGE)) {
+			std::string messageType = messageObject[DAMAGE].asString();
+			messageObject.removeMember(DAMAGE);
+			std::string key = DAMAGE;
 			this->broadcastMessage(messageType, key);
 		}
 	}
