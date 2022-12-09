@@ -1,4 +1,5 @@
 ### About
+-------------------------------------------
 
 🧝**Roguelike Multiplayer Game**🧙‍♂️ written on Rust and C++
 
@@ -27,6 +28,7 @@ The game starts with **entering name**:
 ![Rating](./pictures/rating.png)
 
 ### Installing
+-------------------------------------------
 
 #### For players
 - Make sure you have the rust compiler installed
@@ -39,7 +41,14 @@ cargo --version
 export PATH="~/.cargo/bin"
 export PATH="~/.cargo/env"
 ```
+
+- Enter:
+```bash
+cargo run
+```
 from the directory where the `Cargo.toml` file is
+
+-------------------------------------------
 
 #### For developers
 - Make sure you have the rust compiler installed
@@ -75,9 +84,16 @@ make
     };
 ```
 
+- Enter:
+```bash
+cargo run
+```
+from the directory where the `Cargo.toml` file is
+
 Now experiment with client and server!🧑‍🔬
 
 ### Licence
+-------------------------------------------
 
 Licensed under:
 - MIT license ([LICENSE-MIT](https://github.com/seanmonstar/httparse/blob/master/LICENSE-MIT) or [https://opensource.org/licenses/MIT](https://opensource.org/licenses/MIT))
