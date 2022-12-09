@@ -11,20 +11,20 @@
 6. see players rating
 
 The game starts with ==entering name==:
-![Entering Name](entering_name.png)
+![Entering Name](./pictures/entering_name.png)
 
 ==Single Game:==
-![Single Game](single.png)
+![Single Game](./pictures/single.png)
 
 ==Multiplayer:==
-![Multiplayer Game](multi.png)
+![Multiplayer Game](./pictures/multi.png)
 \* *Blue entity is a player from another computer*
 
 ==Main menu:==
-![Main menu](meny.png)
+![Main menu](./pictures/meny.png)
 
 ==Rating:==
-![Rating](rating.png)
+![Rating](./pictures/rating.png)
 
 ### Installing
 

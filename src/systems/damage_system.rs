@@ -8,6 +8,7 @@ pub struct DamageSystem<'a> {
     pub game_client : &'a mut ClientHandler,
 }
 
+
 impl<'a> System<'a> for DamageSystem<'a> {
     type SystemData = ( 
                         WriteStorage<'a, CombatStats>,
