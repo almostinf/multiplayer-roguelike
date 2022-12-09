@@ -10,20 +10,20 @@
 5. save the game and load saving
 6. see players rating
 
-The game starts with ==entering name==:
+The game starts with **entering name**:
 ![Entering Name](./pictures/entering_name.png)
 
-==Single Game:==
+**Single Game:**
 ![Single Game](./pictures/single.png)
 
-==Multiplayer:==
+**Multiplayer:**
 ![Multiplayer Game](./pictures/multi.png)
 \* *Blue entity is a player from another computer*
 
-==Main menu:==
+**Main menu:**
 ![Main menu](./pictures/meny.png)
 
-==Rating:==
+**Rating:**
 ![Rating](./pictures/rating.png)
 
 ### Installing
