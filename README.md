@@ -92,7 +92,7 @@ cargo run
 ```
 from the directory where the `Cargo.toml` file is
 
-**Now experiment with client and server!**🧑‍🔬
+**Now experiment with client and server!** 🧑‍🔬
 
 ### Licence
 -------------------------------------------
