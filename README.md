@@ -59,7 +59,8 @@ rustc --version
   if you do not have a compiler, [download it](https://rustup.rs/)
   
 - [Download CMake](https://cmake.org/install/) if you don't have it
-  To check enter:
+  
+To check enter:
 ```bash
 cmake --version
 ```
