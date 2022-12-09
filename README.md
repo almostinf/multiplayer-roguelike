@@ -36,6 +36,7 @@ The game starts with **entering name**:
 cargo --version
 ```
   if you do not have a compiler, [download it](https://rustup.rs/)
+
   \* If it does not work after this step, try this:
 ```bash
 export PATH="~/.cargo/bin"
@@ -90,7 +91,7 @@ cargo run
 ```
 from the directory where the `Cargo.toml` file is
 
-Now experiment with client and server!🧑‍🔬
+**Now experiment with client and server!**🧑‍🔬
 
 ### Licence
 -------------------------------------------
