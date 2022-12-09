@@ -65,7 +65,7 @@ To check enter:
 cmake --version
 ```
   
-- From the directory where the `Cargo.toml` file is:
+- From the `src/` directory:
 ```bash
 cd server/server
 mkdir build
