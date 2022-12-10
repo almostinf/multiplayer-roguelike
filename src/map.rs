@@ -3,6 +3,7 @@ use specs::{World, Entity};
 
 use std::cmp::{max, min};
 use serde::{Serialize, Deserialize};
+use std::fs;
 
 use super::Rect;
 use super::constants::*;
@@ -223,9 +224,19 @@ impl rltk::BaseMap for Map {
 }
 
 
+#[derive(Serialize, Deserialize)]
+struct CustomizeTiles {
+    floor : char,
+    wall : char,
+    downstairs : char,
+}
+
 /// Setting glyph and colour to the floor, wall, downstairs tiles
 pub fn draw_map(ecs: &World, ctx: &mut Rltk) {
     let map = ecs.fetch::<Map>();
+
+    let file = fs::File::open("customize.txt").expect("Can't create file");
+    let customize : CustomizeTiles = serde_json::from_reader(file).unwrap();
 
     let mut y = 0;
     let mut x = 0;
@@ -237,15 +248,15 @@ pub fn draw_map(ecs: &World, ctx: &mut Rltk) {
             let mut fg;
             match tile {
                 TileType::Floor => {
-                    glyph = rltk::to_cp437('.');
+                    glyph = rltk::to_cp437(customize.floor);
                     fg = RGB::from_f32(0., 0.5, 0.5);
                 }
                 TileType::Wall => {
-                    glyph = rltk::to_cp437('#');
+                    glyph = rltk::to_cp437(customize.wall);
                     fg = RGB::from_f32(0., 1., 0.);
                 }
                 TileType::DownStairs => {
-                    glyph = rltk::to_cp437('>');
+                    glyph = rltk::to_cp437(customize.downstairs);
                     fg = RGB::from_f32(0., 1., 1.);
                 }
             }
